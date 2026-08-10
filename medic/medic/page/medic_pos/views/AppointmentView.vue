@@ -48,9 +48,26 @@
 				</v-col>
 			</v-row>
 
-			<div v-if="canConfirm" class="d-flex mt-3">
+			<div v-if="canConfirm || canCheckIn" class="d-flex mt-3 ga-2">
 				<v-spacer />
-				<v-btn color="primary" variant="flat" prepend-icon="mdi-check-decagram" :loading="confirming" @click="confirm">
+				<v-btn
+					v-if="canCheckIn"
+					color="primary"
+					variant="tonal"
+					prepend-icon="mdi-login"
+					:loading="checkingIn"
+					@click="checkIn"
+				>
+					{{ __("Check in") }}
+				</v-btn>
+				<v-btn
+					v-if="canConfirm"
+					color="primary"
+					variant="flat"
+					prepend-icon="mdi-check-decagram"
+					:loading="confirming"
+					@click="confirm"
+				>
 					{{ __("Confirm") }}
 				</v-btn>
 			</div>
@@ -113,6 +130,7 @@ const emit = defineEmits(["back"]);
 const { isRtl } = useRtl();
 const loading = ref(false);
 const confirming = ref(false);
+const checkingIn = ref(false);
 const savingNotes = ref(false);
 const doc = ref({});
 const doctorName = ref("");
@@ -122,6 +140,8 @@ const backIcon = computed(() => (isRtl.value ? "mdi-arrow-right" : "mdi-arrow-le
 const isCancelled = computed(() => doc.value.docstatus === 2);
 // Confirm is only reachable on a submitted, still-pending appointment.
 const canConfirm = computed(() => doc.value.docstatus === 1 && doc.value.appointment_status === "انتظار");
+// Check-in assigns the queue; available once submitted and not yet queued.
+const canCheckIn = computed(() => doc.value.docstatus === 1 && !doc.value.queue);
 
 function formatDate(value) {
 	return value ? frappe.datetime.str_to_user(value) : "";
@@ -150,6 +170,17 @@ async function confirm() {
 		await load();
 	} finally {
 		confirming.value = false;
+	}
+}
+
+async function checkIn() {
+	checkingIn.value = true;
+	try {
+		const q = await call("check_in", { appointment: props.name });
+		notifySuccess(__("Checked in — queue {0}", [q]));
+		await load();
+	} finally {
+		checkingIn.value = false;
 	}
 }
 

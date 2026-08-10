@@ -7,6 +7,7 @@
 				:label="__('Patient')"
 				prepend-inner-icon="mdi-account-outline"
 				clearable
+				item-props
 				style="max-width: 220px"
 				@update:search="searchCustomers"
 				@update:model-value="load"
@@ -17,6 +18,7 @@
 				:label="__('Doctor')"
 				prepend-inner-icon="mdi-doctor"
 				clearable
+				item-props
 				style="max-width: 220px"
 				@update:search="searchEmployees"
 				@update:model-value="load"
@@ -39,6 +41,9 @@
 			/>
 			<v-btn color="primary" variant="tonal" icon="mdi-filter-outline" :title="__('Apply filters')" @click="load" />
 			<v-spacer />
+			<v-btn color="primary" variant="tonal" prepend-icon="mdi-calendar-account" class="mr-2" @click="sessionOpen = true">
+				{{ __("New Session") }}
+			</v-btn>
 			<v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="newOpen = true">
 				{{ __("New Appointment") }}
 			</v-btn>
@@ -59,6 +64,21 @@
 					{{ item.appointment_status || "—" }}
 				</v-chip>
 			</template>
+			<template #item.queue="{ item }">
+				<span v-if="item.queue">{{ item.queue }}</span>
+				<v-btn
+					v-else-if="item.docstatus === 1"
+					size="small"
+					variant="tonal"
+					color="primary"
+					prepend-icon="mdi-login"
+					:loading="checkingIn === item.name"
+					@click="checkIn(item.name)"
+				>
+					{{ __("Check in") }}
+				</v-btn>
+				<span v-else class="text-medium-emphasis">—</span>
+			</template>
 			<template #item.actions="{ item }">
 				<v-btn
 					size="small"
@@ -73,19 +93,23 @@
 	</v-card>
 
 	<NewAppointmentDialog v-model="newOpen" @created="load" />
+	<NewSessionDialog v-model="sessionOpen" @created="load" />
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { call, customSearchLink } from "../client.js";
+import { call, notifySuccess, searchLinkOptions } from "../client.js";
 import { APPOINTMENT_STATUS, appointmentStatusColor } from "../constants.js";
 import NewAppointmentDialog from "../components/NewAppointmentDialog.vue";
+import NewSessionDialog from "../components/NewSessionDialog.vue";
 
 const emit = defineEmits(["navigate"]);
 
 const rows = ref([]);
 const loading = ref(false);
 const newOpen = ref(false);
+const sessionOpen = ref(false);
+const checkingIn = ref(null);
 const customerOptions = ref([]);
 const employeeOptions = ref([]);
 const filters = reactive({
@@ -103,6 +127,7 @@ const headers = computed(() => [
 	{ title: __("Doctor"), key: "doctor_name" },
 	{ title: __("Service"), key: "service" },
 	{ title: __("Status"), key: "appointment_status" },
+	{ title: __("Queue"), key: "queue", sortable: false },
 	{ title: "", key: "actions", sortable: false, align: "end" },
 ]);
 
@@ -111,13 +136,11 @@ function formatDate(value) {
 }
 
 async function searchCustomers(txt) {
-	const r = await customSearchLink("Customer", txt);
-	customerOptions.value = r.map((x) => ({ title: x.description || x.value, value: x.value }));
+	customerOptions.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
 }
 
 async function searchEmployees(txt) {
-	const r = await customSearchLink("Employee", txt);
-	employeeOptions.value = r.map((x) => ({ title: x.description || x.value, value: x.value }));
+	employeeOptions.value = await searchLinkOptions("Employee", txt, {}, "employee_name");
 }
 
 async function load() {
@@ -131,6 +154,17 @@ async function load() {
 
 function view(name) {
 	emit("navigate", "appointment", { name });
+}
+
+async function checkIn(name) {
+	checkingIn.value = name;
+	try {
+		const q = await call("check_in", { appointment: name });
+		notifySuccess(__("Checked in — queue {0}", [q]));
+		await load();
+	} finally {
+		checkingIn.value = null;
+	}
 }
 
 onMounted(() => {

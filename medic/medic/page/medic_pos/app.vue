@@ -94,6 +94,7 @@ import PatientsView from "./views/PatientsView.vue";
 import PatientView from "./views/PatientView.vue";
 import AppointmentsView from "./views/AppointmentsView.vue";
 import AppointmentView from "./views/AppointmentView.vue";
+import TreatmentsView from "./views/TreatmentsView.vue";
 import ProfileView from "./views/ProfileView.vue";
 import ScheduleView from "./views/ScheduleView.vue";
 
@@ -109,6 +110,7 @@ const initials = computed(() => (fullName.value || "?").trim().charAt(0).toUpper
 const navItems = [
 	{ value: "patients", title: "Patients", icon: "mdi-account-injury-outline" },
 	{ value: "appointments", title: "Appointments", icon: "mdi-calendar-check-outline" },
+	{ value: "treatments", title: "Treatments", icon: "mdi-clipboard-pulse-outline" },
 ];
 
 const activeView = ref("patients");
@@ -121,6 +123,7 @@ const componentMap = shallowRef({
 	patient: PatientView,
 	appointments: AppointmentsView,
 	appointment: AppointmentView,
+	treatments: TreatmentsView,
 	profile: ProfileView,
 	schedule: ScheduleView,
 });

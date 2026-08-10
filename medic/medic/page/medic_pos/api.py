@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
-from frappe.desk.search import build_for_autosuggest, search_widget
-from frappe.utils import today
+from frappe.desk.search import build_for_autosuggest, sanitize_searchfield, search_widget
+from frappe.utils import cint, flt, today
 
 PATIENT_FIELDS = ("customer_name", "date_of_birth", "custom_phone_number", "gender", "blood_type")
 
@@ -330,6 +330,237 @@ def save_appointment_notes(name, notes=None):
 	return doc.name
 
 
+# ---------------------------------------------------------------- treatment plans
+
+DEPOSIT_PCT = 0.2
+
+
+def _invoice_financials(invoice):
+	"""Money snapshot for a plan's Sales Invoice. No invoice => treated as fully paid."""
+	if not invoice:
+		return {"grand_total": 0.0, "paid": 0.0, "outstanding_amount": 0.0, "paid_pct": 1.0}
+	si = frappe.db.get_value(
+		"Sales Invoice", invoice, ["grand_total", "outstanding_amount"], as_dict=True
+	)
+	grand = flt(si.grand_total)
+	outstanding = flt(si.outstanding_amount)
+	paid = grand - outstanding
+	return {
+		"grand_total": grand,
+		"paid": paid,
+		"outstanding_amount": outstanding,
+		"paid_pct": (paid / grand) if grand else 1.0,
+	}
+
+
+def _session_gate_ok(plan, is_last):
+	"""Two waivers live here: per-plan skip_deposit and per-customer allow_credit."""
+	fin = _invoice_financials(plan.invoice)
+	if is_last:
+		if fin["outstanding_amount"] <= 0:
+			return True
+		return bool(frappe.db.get_value("Customer", plan.customer, "allow_credit"))
+	if plan.skip_deposit:
+		return True
+	return fin["paid_pct"] >= DEPOSIT_PCT
+
+
+@frappe.whitelist()
+def create_treatment_plan(customer, employee, service, total_sessions, notes=None):
+	total_sessions = cint(total_sessions)
+	if total_sessions < 1:
+		frappe.throw(_("Total sessions must be at least 1."))
+
+	plan = frappe.new_doc("Treatment Plan")
+	plan.update(
+		{
+			"status": "Active",
+			"customer": customer,
+			"employee": employee,
+			"service": service,
+			"total_sessions": total_sessions,
+			"notes": notes,
+		}
+	)
+	plan.insert()
+	plan.submit()
+
+	# One submitted invoice for the whole plan; payments ride on it as Payment Entries.
+	si = frappe.new_doc("Sales Invoice")
+	si.customer = customer
+	si.company = _company()
+	si.append("items", {"item_code": service, "qty": total_sessions})
+	si.insert()
+	si.submit()
+
+	plan.db_set("invoice", si.name)
+	return plan.name
+
+
+def _plan_dict(plan):
+	data = plan.as_dict() if hasattr(plan, "as_dict") else dict(plan)
+	data.update(_invoice_financials(data.get("invoice")))
+	company = _company()
+	data["currency"] = frappe.db.get_value("Company", company, "default_currency") if company else None
+	return data
+
+
+@frappe.whitelist()
+def get_treatment_plans(customer):
+	plans = frappe.get_all(
+		"Treatment Plan",
+		filters={"customer": customer, "docstatus": 1},
+		fields=[
+			"name", "status", "service", "employee",
+			"total_sessions", "completed_sessions", "invoice",
+		],
+		order_by="creation desc",
+	)
+	return [_plan_dict(p) for p in plans]
+
+
+@frappe.whitelist()
+def get_active_treatment_plans(customer=None):
+	filters = {"status": "Active", "docstatus": 1}
+	if customer:
+		filters["customer"] = customer
+
+	out = []
+	for p in frappe.get_all(
+		"Treatment Plan",
+		filters=filters,
+		fields=[
+			"name", "customer", "employee", "service",
+			"total_sessions", "completed_sessions", "invoice",
+		],
+	):
+		if cint(p.completed_sessions) >= cint(p.total_sessions):
+			continue  # no sessions left to book
+		p["customer_name"] = frappe.db.get_value("Customer", p.customer, "customer_name")
+		p.update(_invoice_financials(p.invoice))
+		out.append(p)
+	return out
+
+
+@frappe.whitelist()
+def list_treatment_plans(customer=None, employee=None, status=None, limit=100):
+	"""Standalone Treatments view list, filters applied on the DB."""
+	filters = {"docstatus": 1}
+	if customer:
+		filters["customer"] = customer
+	if employee:
+		filters["employee"] = employee
+	if status:
+		filters["status"] = status
+
+	rows = frappe.qb.get_query(
+		"Treatment Plan",
+		fields=[
+			"name", "customer", "customer.customer_name as customer_name",
+			"employee", "employee.employee_name as doctor_name",
+			"service", "status", "total_sessions", "completed_sessions", "invoice",
+		],
+		filters=filters,
+		order_by="creation desc",
+		limit=limit,
+	).run(as_dict=True)
+	for r in rows:
+		r.update(_invoice_financials(r.get("invoice")))
+	return rows
+
+
+@frappe.whitelist()
+def get_treatment_plan(name):
+	plan = frappe.get_doc("Treatment Plan", name)
+	data = _plan_dict(plan)
+	data["sessions"] = frappe.get_all(
+		"Patient Appointment",
+		filters={"treatment_plan": name},  # Data match on the plan name
+		fields=["name", "appointment_date", "session_no", "appointment_status", "queue", "docstatus"],
+		order_by="session_no asc",
+	)
+	return data
+
+
+@frappe.whitelist()
+def add_payment(invoice, amount, mode_of_payment, reference_no=None, reference_date=None):
+	from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+
+	pe = get_payment_entry("Sales Invoice", invoice, party_amount=flt(amount))
+	pe.mode_of_payment = mode_of_payment
+	# Bank-type modes require a reference; the dialog collects it for those.
+	if reference_no:
+		pe.reference_no = reference_no
+	if reference_date:
+		pe.reference_date = reference_date
+	pe.insert()
+	pe.submit()
+	return pe.name
+
+
+@frappe.whitelist()
+def create_session(treatment_plan):
+	plan = frappe.get_doc("Treatment Plan", treatment_plan)
+	session_no = frappe.db.count("Patient Appointment", {"treatment_plan": treatment_plan}) + 1
+	if session_no > cint(plan.total_sessions):
+		frappe.throw(_("All sessions for this plan have already been created."))
+
+	is_last = session_no == cint(plan.total_sessions)
+	if is_last and not _session_gate_ok(plan, is_last=True):
+		frappe.throw(_("The plan invoice must be fully paid before the last session."))
+
+	doc = frappe.new_doc("Patient Appointment")
+	doc.update(
+		{
+			"naming_series": "APP-.YY.-",
+			"appointment_type": "علاج",
+			"customer": plan.customer,
+			"employee": plan.employee,
+			"appointment_date": today(),
+			"service_type": frappe.db.get_value("Item", plan.service, "item_group"),
+			"service": plan.service,
+			"treatment_plan": plan.name,
+			"session_no": session_no,
+			"appointment_status": "انتظار",
+		}
+	)
+	doc.insert()
+	doc.submit()
+	return doc.name
+
+
+def _next_queue(employee, appointment_date):
+	taken = frappe.get_all(
+		"Patient Appointment",
+		filters={"employee": employee, "appointment_date": appointment_date, "queue": [">", 0]},
+		pluck="queue",
+	)
+	return (max(taken) + 1) if taken else 1
+
+
+@frappe.whitelist()
+def check_in(appointment):
+	"""Assign the per-doctor, per-day queue number when the patient arrives."""
+	appt = frappe.get_doc("Patient Appointment", appointment)
+	if appt.queue:
+		return appt.queue  # already checked in
+
+	if appt.treatment_plan:
+		plan = frappe.get_doc("Treatment Plan", appt.treatment_plan)
+		is_last = cint(appt.session_no) == cint(plan.total_sessions)
+		if not _session_gate_ok(plan, is_last):
+			frappe.throw(_("Payment requirement for this session is not met yet."))
+	else:
+		if appt.appointment_status != "مؤكد":
+			frappe.throw(_("Appointment must be paid before check-in."))
+
+	q = _next_queue(appt.employee, appt.appointment_date)
+	appt.db_set("queue", q)
+	if appt.treatment_plan:
+		plan.db_set("completed_sessions", cint(plan.completed_sessions) + 1)
+	return q
+
+
 # ---------------------------------------------------------------- search
 
 
@@ -343,7 +574,9 @@ def custom_search_link(
 	searchfield: str | None = None,
 	reference_doctype: str | None = None,
 	ignore_user_permissions: bool = False,
+	label_fieldname: str | None = None,
 ):
+	"""Link search. With `label_fieldname`, each row also carries that field's value as `label`."""
 	results = search_widget(
 		doctype,
 		txt.strip(),
@@ -354,4 +587,39 @@ def custom_search_link(
 		reference_doctype=reference_doctype,
 		ignore_user_permissions=ignore_user_permissions,
 	)
-	return build_for_autosuggest(results, doctype=doctype)
+
+	rows = build_for_autosuggest(results, doctype=doctype)
+
+	if not label_fieldname:
+		return rows
+
+	sanitize_searchfield(label_fieldname)
+
+	meta = frappe.get_meta(doctype)
+	if label_fieldname != "name" and not meta.has_field(label_fieldname):
+		frappe.throw(_("Invalid label field {0}").format(label_fieldname))
+
+	names = [row.get("value") for row in rows if row.get("value")]
+	if not names:
+		return rows
+
+	if label_fieldname == "name":
+		labels = {name: name for name in names}
+	else:
+		# search_widget already applied permissions, so the labels are fetched for `names` as-is.
+		labels = dict(
+			frappe.get_all(
+				doctype,
+				filters={"name": ["in", names]},
+				fields=["name", label_fieldname],
+				limit_page_length=0,
+				as_list=True,
+			)
+		)
+
+	for row in rows:
+		value = row.get("value")
+		if value in labels:
+			row["label"] = labels[value]
+
+	return rows

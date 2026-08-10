@@ -9,3 +9,7 @@ export const APPOINTMENT_STATUS = ["انتظار", "غير مؤكد", "مؤكد"
 export function appointmentStatusColor(status) {
 	return { انتظار: "warning", "غير مؤكد": "info", مؤكد: "success" }[status] || "surface-variant";
 }
+
+export function treatmentStatusColor(status) {
+	return { Active: "primary", Completed: "success", Cancelled: "error" }[status] || "surface-variant";
+}

@@ -43,19 +43,6 @@ def on_sales_invoice_submit(doc, method=None):
 		frappe.db.set_value("Appointment Actions", action_exists, "paid", 1)
 
 def confirm_appointment(doc):
+	# Queue is assigned at check-in (medic.api.check_in), not on payment.
 	pa_doc = frappe.get_doc("Patient Appointment", doc.patient_appointment)
-	fields_to_update = {
-		"appointment_status": "مؤكد",
-	}
-
-	queue = frappe.db.get_all(
-		"Patient Appointment",
-		filters={"employee": pa_doc.employee, "appointment_status": "مؤكد"},
-		pluck="queue"
-	)
-	if queue:
-		next_queue = max(queue) + 1
-	else:
-		next_queue = 1
-	fields_to_update["queue"] = next_queue
-	pa_doc.db_set(fields_to_update)
+	pa_doc.db_set("appointment_status", "مؤكد")

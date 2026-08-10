@@ -33,8 +33,9 @@
 								:items="options.customer"
 								:label="__('Patient')"
 								prepend-inner-icon="mdi-account-outline"
+								item-props
 								:rules="[required]"
-								@update:search="(t) => searchLink('customer', 'Customer', t)"
+								@update:search="(t) => searchLink('customer', 'Customer', t, {}, 'customer_name')"
 							/>
 						</v-col>
 						<v-col cols="12" md="6">
@@ -43,8 +44,9 @@
 								:items="options.employee"
 								:label="__('Doctor')"
 								prepend-inner-icon="mdi-doctor"
+								item-props
 								:rules="[required]"
-								@update:search="(t) => searchLink('employee', 'Employee', t)"
+								@update:search="(t) => searchLink('employee', 'Employee', t, {}, 'employee_name')"
 							/>
 						</v-col>
 						<v-col cols="12" md="6">
@@ -53,8 +55,9 @@
 								:items="options.service_type"
 								:label="__('Service Type')"
 								prepend-inner-icon="mdi-shape-outline"
+								item-props
 								:rules="[required]"
-								@update:search="(t) => searchLink('service_type', 'Item Group', t, serviceTypeFilters)"
+								@update:search="(t) => searchLink('service_type', 'Item Group', t, serviceTypeFilters, 'name')"
 								@update:model-value="onServiceTypeChange"
 							/>
 						</v-col>
@@ -64,9 +67,10 @@
 								:items="options.service"
 								:label="__('Service')"
 								prepend-inner-icon="mdi-medical-bag"
+								item-props
 								:disabled="!model.service_type"
 								:rules="[required]"
-								@update:search="(t) => searchLink('service', 'Item', t, { item_group: model.service_type })"
+								@update:search="(t) => searchLink('service', 'Item', t, { item_group: model.service_type }, 'item_name')"
 							/>
 						</v-col>
 						<v-col cols="12">
@@ -97,7 +101,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
-import { call, customSearchLink, notifySuccess } from "../client.js";
+import { call, notifySuccess, searchLinkOptions } from "../client.js";
 import { APPOINTMENT_TYPES } from "../constants.js";
 
 const props = defineProps({
@@ -117,7 +121,7 @@ const options = reactive({ customer: [], employee: [], service_type: [], service
 
 // Mirror patient_appointment.js: service types are groups under the clinic's parent service group.
 const serviceTypeFilters = computed(() => {
-	const filters = { is_group: 1 };
+	const filters = { is_group: 0 };
 	if (frappe.boot.parent_service) filters.parent_item_group = frappe.boot.parent_service;
 	return filters;
 });
@@ -137,19 +141,15 @@ function required(value) {
 	return !!value || __("Required");
 }
 
-async function searchLink(field, doctype, txt, filters = {}) {
-	const rows = await customSearchLink(doctype, txt, filters);
-	options[field] = rows.map((r) => ({
-		title: r.description ? `${r.value} · ${r.description}` : r.value,
-		value: r.value,
-	}));
+async function searchLink(field, doctype, txt, filters = {}, labelFieldname = null) {
+	options[field] = await searchLinkOptions(doctype, txt, filters, labelFieldname);
 }
 
 // Service is scoped to the chosen service type, so reset it when the type changes.
 function onServiceTypeChange() {
 	model.service = null;
 	options.service = [];
-	if (model.service_type) searchLink("service", "Item", "", { item_group: model.service_type });
+	if (model.service_type) searchLink("service", "Item", "", { item_group: model.service_type }, "item_name");
 }
 
 async function save() {
@@ -172,8 +172,8 @@ watch(open, (isOpen) => {
 	if (!isOpen) return;
 	Object.assign(model, blank());
 	form.value?.resetValidation();
-	searchLink("customer", "Customer", "");
-	searchLink("employee", "Employee", "");
-	searchLink("service_type", "Item Group", "", serviceTypeFilters.value);
+	searchLink("customer", "Customer", "", {}, "customer_name");
+	searchLink("employee", "Employee", "", {}, "employee_name");
+	searchLink("service_type", "Item Group", "", serviceTypeFilters.value, "name");
 });
 </script>

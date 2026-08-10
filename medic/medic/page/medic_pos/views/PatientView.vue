@@ -108,6 +108,10 @@
 					{{ __("Save Medical History") }}
 				</v-btn>
 			</div>
+
+			<v-divider class="my-5" />
+
+			<PatientTreatments :customer="props.patient" />
 		</v-card-text>
 	</v-card>
 </template>
@@ -118,6 +122,7 @@ import { useRtl } from "vuetify";
 import { call, customSearchLink, formatCurrency, notifySuccess } from "../client.js";
 import { BLOOD_TYPES } from "../constants.js";
 import IllnessTable from "../components/IllnessTable.vue";
+import PatientTreatments from "../components/PatientTreatments.vue";
 
 // Illness.illness_type options, as defined on the Illness doctype.
 const GENERAL_ILLNESS = "أخرى";

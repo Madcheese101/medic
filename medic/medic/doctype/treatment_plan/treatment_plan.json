@@ -10,13 +10,15 @@
   "status",
   "customer",
   "employee",
+  "service",
   "total_sessions",
   "completed_sessions",
   "invoice",
   "skip_deposit",
   "deposit_waiver_note",
   "notes",
-  "naming_series"
+  "naming_series",
+  "amended_from"
  ],
  "fields": [
   {
@@ -33,19 +35,24 @@
   {
    "fieldname": "customer",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Patient",
-   "options": "Customer"
+   "options": "Customer",
+   "reqd": 1
   },
   {
    "fieldname": "employee",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Doctor",
-   "options": "Employee"
+   "options": "Employee",
+   "reqd": 1
   },
   {
    "fieldname": "total_sessions",
    "fieldtype": "Int",
-   "label": "Total Sessions"
+   "label": "Total Sessions",
+   "non_negative": 1
   },
   {
    "fieldname": "completed_sessions",
@@ -82,13 +89,31 @@
    "fieldtype": "Select",
    "label": "Series",
    "options": "TP-.YY.-"
+  },
+  {
+   "fieldname": "service",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Service",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Treatment Plan",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-08 01:41:25.402040",
+ "modified": "2026-08-10 02:40:48.809168",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Treatment Plan",

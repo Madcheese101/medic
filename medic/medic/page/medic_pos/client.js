@@ -7,11 +7,46 @@ export async function call(method, args = {}) {
 	return r.message;
 }
 
-export function customSearchLink(doctype, txt, filters = {}) {
+// `labelFieldname` asks the server to attach that field's value to each row as `label`.
+export function customSearchLink(doctype, txt, filters = {}, labelFieldname = null) {
 	// Autocomplete fires per keystroke - degrade to an empty list instead of a dialog.
-	return call("custom_search_link", { doctype, txt: txt || "", page_length: 20, filters })
+	return call("custom_search_link", {
+		doctype,
+		txt: txt || "",
+		page_length: 20,
+		filters,
+		label_fieldname: labelFieldname,
+	})
 		.then((rows) => rows || [])
 		.catch(() => []);
+}
+
+// The label is repeated as the first part of `description`, so drop it - a subtitle that only
+// echoes the title is noise. Returns undefined when nothing else is left to show.
+function subtitleFor(row, labelFieldname) {
+	const label = (row.label || "").trim();
+	const parts = (row.description || "")
+		.split(",")
+		.map((part) => part.trim())
+		.filter((part) => part && part !== label);
+
+	// Any label other than `name` leaves the id off the title, so surface it here instead -
+	// unless the record is autonamed after that same label and would only repeat the title.
+	const showId = labelFieldname && labelFieldname !== "name" && row.value !== label;
+	if (showId && !parts.includes(row.value)) parts.unshift(row.value);
+
+	return parts.join(" · ") || undefined;
+}
+
+// Link search results as v-autocomplete items. Needs `item-props` on the field for the
+// subtitle to render.
+export async function searchLinkOptions(doctype, txt, filters = {}, labelFieldname = null) {
+	const rows = await customSearchLink(doctype, txt, filters, labelFieldname);
+	return rows.map((r) => ({
+		title: r.label || r.value,
+		subtitle: subtitleFor(r, labelFieldname),
+		value: r.value,
+	}));
 }
 
 export function notifySuccess(message) {
