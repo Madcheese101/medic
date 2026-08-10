@@ -1,0 +1,32 @@
+{
+ "content": null,
+ "creation": "2026-07-15 20:31:33.852069",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-07-15 20:32:45.128921",
+ "modified_by": "Administrator",
+ "module": "Medic",
+ "name": "medic-pos",
+ "owner": "Administrator",
+ "page_name": "medic-pos",
+ "roles": [
+  {
+   "role": "Medic Doctor"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Medic POS"
+}

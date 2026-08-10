@@ -26,7 +26,7 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/medic/css/medic.css"
-# app_include_js = "/assets/medic/js/medic.js"
+app_include_js = "medic-pos.bundle.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/medic/css/medic.css"
@@ -144,7 +144,17 @@ app_license = "mit"
 # 		"on_trash": "method"
 # 	}
 # }
-
+doc_events = {
+	"Employee": {
+		"after_insert": "medic.events.on_employee_create"
+	},
+	"Customer": {
+		"after_insert": "medic.events.on_customer_create"
+	},
+	"Sales Invoice": {
+		"on_submit": "medic.events.on_sales_invoice_submit"
+	}
+}
 # Scheduled Tasks
 # ---------------
 
@@ -242,3 +252,19 @@ app_license = "mit"
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
+extend_bootinfo = "medic.boot.extend_boot_info"
+
+fixtures = [
+	{
+		"doctype": "Custom Field",
+		"filters": [
+			["module", "=", "Medic"]
+		]
+	},
+	{
+		"doctype": "Property Setter",
+		"filters": [
+			["module", "=", "Medic"]
+		]
+	}
+]

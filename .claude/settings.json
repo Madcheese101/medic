@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bench --site default execute social_ads.social_ads.page.sads_pos.api.get_journal_entries --kwargs \"{'voucher_type':'Foreign Currency Purchase'}\")",
+      "Bash(bench --site default execute social_ads.social_ads.page.sads_pos.api.get_journal_entries --kwargs \"{'voucher_type':'Expense'}\")",
+      "Bash(python3 -)",
+      "Bash(ln -sfn ../../node_modules node_modules)"
+    ]
+  }
+}

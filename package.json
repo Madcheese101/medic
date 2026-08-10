@@ -1,0 +1,10 @@
+{
+  "name": "medic",
+  "version": "0.0.1",
+  "description": "Clinic management application",
+  "dependencies": {
+    "@fontsource/ibm-plex-sans-arabic": "^5.0.0",
+    "@mdi/font": "^7.4.47",
+    "vuetify": "^3.7.19"
+  }
+}
