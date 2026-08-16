@@ -7,6 +7,7 @@ import * as components from "vuetify/components";
 import * as directives from "vuetify/directives";
 import { ar, en } from "vuetify/locale";
 import App from "../../../medic/page/medic_pos/app.vue";
+import router from "../../../medic/page/medic_pos/router/index.js";
 
 frappe.MedicPos.Controller = class {
 	constructor({ wrapper }) {
@@ -90,6 +91,7 @@ frappe.MedicPos.Controller = class {
 		app.config.globalProperties.__ = window.__;
 		app.use(createPinia());
 		app.use(vuetify);
+		app.use(router);
 		this.$component = app.mount(this.$wrapper.get(0));
 	}
 };

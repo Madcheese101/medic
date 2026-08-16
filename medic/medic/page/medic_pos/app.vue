@@ -74,29 +74,25 @@
 
 		<v-main>
 			<v-container fluid class="pa-3 pa-sm-6">
-				<component
-					:is="activeComponent"
-					:key="activeView"
-					v-bind="viewParams"
-					@navigate="selectView"
-					@back="goBack"
-				/>
+				<router-view v-slot="{ Component, route }">
+					<component
+						:is="Component"
+						:key="route.fullPath"
+						v-bind="route.params"
+						@navigate="selectView"
+						@back="goBack"
+					/>
+				</router-view>
 			</v-container>
 		</v-main>
 	</v-app>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useDisplay } from "vuetify";
 import { useDefaultsStore } from "./stores/defaults.js";
-import PatientsView from "./views/PatientsView.vue";
-import PatientView from "./views/PatientView.vue";
-import AppointmentsView from "./views/AppointmentsView.vue";
-import AppointmentView from "./views/AppointmentView.vue";
-import TreatmentsView from "./views/TreatmentsView.vue";
-import ProfileView from "./views/ProfileView.vue";
-import ScheduleView from "./views/ScheduleView.vue";
 
 const defaultsStore = useDefaultsStore();
 const { mobile } = useDisplay();
@@ -113,37 +109,20 @@ const navItems = [
 	{ value: "treatments", title: "Treatments", icon: "mdi-clipboard-pulse-outline" },
 ];
 
-const activeView = ref("patients");
-const viewParams = ref({});
-// Visited entries, so each view's back button returns where the user came from.
-const history = ref([]);
-// `patient` is reachable only per-patient, so it stays out of navItems.
-const componentMap = shallowRef({
-	patients: PatientsView,
-	patient: PatientView,
-	appointments: AppointmentsView,
-	appointment: AppointmentView,
-	treatments: TreatmentsView,
-	profile: ProfileView,
-	schedule: ScheduleView,
-});
-
-const activeComponent = computed(() => componentMap.value[activeView.value]);
+const router = useRouter();
+const route = useRoute();
+// Route name drives nav-item highlighting; the router owns the current view.
+const activeView = computed(() => route.name);
 
 function selectView(value, params = {}) {
-	if (value !== activeView.value) {
-		history.value.push({ view: activeView.value, params: viewParams.value });
-	}
-	activeView.value = value;
-	viewParams.value = params;
+	// Navigating to the current route resolves to a failure instead of rejecting;
+	// swallow it so it never surfaces as an unhandled rejection.
+	router.push({ name: value, params }).catch(() => {});
 	if (mobile.value) drawer.value = false;
 }
 
 function goBack() {
-	const previous = history.value.pop();
-	if (!previous) return;
-	activeView.value = previous.view;
-	viewParams.value = previous.params;
+	router.back();
 }
 
 // On mobile the button opens/closes the drawer; on desktop it collapses it to a rail.
