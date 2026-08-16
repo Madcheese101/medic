@@ -12,91 +12,163 @@
 			<span class="text-truncate">{{ __("New Appointment") }}</span>
 		</v-card-title>
 		<v-divider />
-		<v-card-text>
-			<v-form ref="form" @submit.prevent="save">
-				<v-row dense>
-					<v-col cols="12" md="6">
-						<v-select
-							v-model="model.appointment_type"
-							:items="APPOINTMENT_TYPES"
-							:label="__('Appointment Type')"
-							prepend-inner-icon="mdi-clipboard-text-outline"
-							:rules="[required]"
-						/>
-					</v-col>
-					<v-col cols="12" md="6">
-						<v-text-field
-							v-model="model.appointment_date"
-							type="date"
-							:label="__('Appointment Date')"
-							prepend-inner-icon="mdi-calendar"
-							:rules="[required]"
-						/>
-					</v-col>
-					<v-col cols="12" md="6">
-						<v-autocomplete
-							v-model="model.customer"
-							:items="options.customer"
-							:label="__('Patient')"
-							prepend-inner-icon="mdi-account-outline"
-							item-props
-							:rules="[required]"
-							@update:search="(t) => searchLink('customer', 'Customer', t, {}, 'customer_name')"
-						/>
-					</v-col>
-					<v-col cols="12" md="6">
-						<v-autocomplete
-							v-model="model.employee"
-							:items="options.employee"
-							:label="__('Doctor')"
-							prepend-inner-icon="mdi-doctor"
-							item-props
-							:rules="[required]"
-							@update:search="(t) => searchLink('employee', 'Employee', t, {}, 'employee_name')"
-						/>
-					</v-col>
-					<v-col cols="12" md="6">
-						<v-autocomplete
-							v-model="model.service_type"
-							:items="options.service_type"
-							:label="__('Service Type')"
-							prepend-inner-icon="mdi-shape-outline"
-							item-props
-							:rules="[required]"
-							@update:search="(t) => searchLink('service_type', 'Item Group', t, serviceTypeFilters, 'name')"
-							@update:model-value="onServiceTypeChange"
-						/>
-					</v-col>
-					<v-col cols="12" md="6">
-						<v-autocomplete
-							v-model="model.service"
-							:items="options.service"
-							:label="__('Service')"
-							prepend-inner-icon="mdi-medical-bag"
-							item-props
-							:disabled="!model.service_type"
-							:rules="[required]"
-							@update:search="(t) => searchLink('service', 'Item', t, { item_group: model.service_type }, 'item_name')"
-						/>
-					</v-col>
-					<v-col cols="12">
-						<v-textarea
-							v-model="model.notes"
-							:label="__('Notes')"
-							variant="outlined"
-							rows="2"
-							auto-grow
-							hide-details="auto"
-						/>
-					</v-col>
-				</v-row>
-			</v-form>
-		</v-card-text>
+
+		<v-stepper v-model="step" :items="steps" hide-actions flat>
+			<!-- Step 1: pick an existing patient, or create one inline. -->
+			<template #item.1>
+				<v-form ref="step1Form">
+					<v-checkbox
+						v-model="isNew"
+						:label="__('Is new Patient')"
+						density="comfortable"
+						hide-details
+						class="mb-2"
+					/>
+					<v-row v-if="!isNew" dense>
+						<v-col cols="12">
+							<v-autocomplete
+								v-model="customer"
+								:items="options.customer"
+								:label="__('Patient')"
+								prepend-inner-icon="mdi-account-outline"
+								item-props
+								:rules="[required]"
+								@update:search="(t) => searchLink('customer', 'Customer', t, {}, 'customer_name')"
+							/>
+						</v-col>
+					</v-row>
+					<v-row v-else dense>
+						<v-col cols="12" md="6">
+							<v-text-field
+								v-model="patient.customer_name"
+								:label="__('Patient Name')"
+								prepend-inner-icon="mdi-account-outline"
+								:rules="[required]"
+							/>
+						</v-col>
+						<v-col cols="12" md="6">
+							<v-text-field
+								v-model="patient.date_of_birth"
+								type="date"
+								:label="__('Date of Birth')"
+								prepend-inner-icon="mdi-calendar"
+								:rules="[required]"
+							/>
+						</v-col>
+						<v-col cols="12" md="6">
+							<v-text-field
+								v-model="patient.custom_phone_number"
+								:label="__('Mobile No')"
+								prepend-inner-icon="mdi-phone-outline"
+								:hint="__('Include the country code, e.g. +218…')"
+								:rules="[required]"
+							/>
+						</v-col>
+						<v-col cols="12" md="6">
+							<v-autocomplete
+								v-model="patient.gender"
+								:items="genders"
+								:loading="genderLoading"
+								:label="__('Gender')"
+								prepend-inner-icon="mdi-gender-male-female"
+								:rules="[required]"
+								@update:search="searchGenders"
+							/>
+						</v-col>
+						<v-col cols="12" md="6">
+							<v-select
+								v-model="patient.blood_type"
+								:items="BLOOD_TYPES"
+								:label="__('Blood Type')"
+								prepend-inner-icon="mdi-water-outline"
+								clearable
+							/>
+						</v-col>
+					</v-row>
+				</v-form>
+			</template>
+
+			<!-- Step 2: appointment details. -->
+			<template #item.2>
+				<v-form ref="step2Form">
+					<v-row dense>
+						<v-col cols="12" md="6">
+							<v-select
+								v-model="appt.appointment_type"
+								:items="APPOINTMENT_TYPES"
+								:label="__('Appointment Type')"
+								prepend-inner-icon="mdi-clipboard-text-outline"
+								:rules="[required]"
+							/>
+						</v-col>
+						<v-col cols="12" md="6">
+							<v-text-field
+								v-model="appt.appointment_date"
+								type="date"
+								:label="__('Appointment Date')"
+								prepend-inner-icon="mdi-calendar"
+								:rules="[required]"
+							/>
+						</v-col>
+						<v-col cols="12" md="6">
+							<v-autocomplete
+								v-model="appt.employee"
+								:items="options.employee"
+								:label="__('Doctor')"
+								prepend-inner-icon="mdi-doctor"
+								item-props
+								:rules="[required]"
+								@update:search="(t) => searchLink('employee', 'Employee', t, {}, 'employee_name')"
+							/>
+						</v-col>
+						<v-col cols="12" md="6">
+							<v-autocomplete
+								v-model="appt.service_type"
+								:items="options.service_type"
+								:label="__('Service Type')"
+								prepend-inner-icon="mdi-shape-outline"
+								item-props
+								:rules="[required]"
+								@update:search="(t) => searchLink('service_type', 'Item Group', t, serviceTypeFilters, 'name')"
+								@update:model-value="onServiceTypeChange"
+							/>
+						</v-col>
+						<v-col cols="12" md="6">
+							<v-autocomplete
+								v-model="appt.service"
+								:items="options.service"
+								:label="__('Service')"
+								prepend-inner-icon="mdi-medical-bag"
+								item-props
+								:disabled="!appt.service_type"
+								:rules="[required]"
+								@update:search="(t) => searchLink('service', 'Item', t, { item_group: appt.service_type }, 'item_name')"
+							/>
+						</v-col>
+						<v-col cols="12">
+							<v-textarea
+								v-model="appt.notes"
+								:label="__('Notes')"
+								variant="outlined"
+								rows="2"
+								auto-grow
+								hide-details="auto"
+							/>
+						</v-col>
+					</v-row>
+				</v-form>
+			</template>
+		</v-stepper>
+
 		<v-divider />
 		<v-card-actions>
-			<v-spacer />
 			<v-btn variant="text" @click="emit('cancel')">{{ __("Cancel") }}</v-btn>
-			<v-btn color="primary" variant="flat" :loading="saving" @click="save">
+			<v-spacer />
+			<v-btn v-if="step === 2" variant="text" @click="step = 1">{{ __("Back") }}</v-btn>
+			<v-btn v-if="step === 1" color="primary" variant="flat" @click="nextStep">
+				{{ __("Next") }}
+			</v-btn>
+			<v-btn v-else color="primary" variant="flat" :loading="saving" @click="save">
 				{{ __("Create") }}
 			</v-btn>
 		</v-card-actions>
@@ -106,16 +178,43 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRtl } from "vuetify";
-import { call, notifySuccess, searchLinkOptions } from "../client.js";
-import { APPOINTMENT_TYPES } from "../constants.js";
+import { call, customSearchLink, notifySuccess, searchLinkOptions } from "../client.js";
+import { APPOINTMENT_TYPES, BLOOD_TYPES } from "../constants.js";
 
 const emit = defineEmits(["created", "cancel"]);
 
 const { isRtl } = useRtl();
 const backIcon = computed(() => (isRtl.value ? "mdi-arrow-right" : "mdi-arrow-left"));
 
-const form = ref(null);
+const steps = [__("Patient"), __("Appointment")];
+const step = ref(1);
+const step1Form = ref(null);
+const step2Form = ref(null);
 const saving = ref(false);
+
+// Step 1 state: either an existing customer, or a new patient to create.
+const isNew = ref(false);
+const customer = ref(null);
+const patient = reactive({
+	customer_name: "",
+	date_of_birth: "",
+	custom_phone_number: "",
+	gender: null,
+	blood_type: null,
+});
+const genders = ref([]);
+const genderLoading = ref(false);
+
+// Step 2 state: the appointment itself.
+const appt = reactive({
+	appointment_type: null,
+	appointment_date: frappe.datetime.get_today(),
+	employee: null,
+	service_type: null,
+	service: null,
+	notes: "",
+});
+
 const options = reactive({ customer: [], employee: [], service_type: [], service: [] });
 
 // Mirror patient_appointment.js: service types are groups under the clinic's parent service group.
@@ -123,16 +222,6 @@ const serviceTypeFilters = computed(() => {
 	const filters = { is_group: 0 };
 	if (frappe.boot.parent_service) filters.parent_item_group = frappe.boot.parent_service;
 	return filters;
-});
-
-const model = reactive({
-	appointment_type: null,
-	appointment_date: frappe.datetime.get_today(),
-	customer: null,
-	employee: null,
-	service_type: null,
-	service: null,
-	notes: "",
 });
 
 function required(value) {
@@ -143,20 +232,38 @@ async function searchLink(field, doctype, txt, filters = {}, labelFieldname = nu
 	options[field] = await searchLinkOptions(doctype, txt, filters, labelFieldname);
 }
 
+async function searchGenders(txt) {
+	genderLoading.value = true;
+	const results = await customSearchLink("Gender", txt);
+	genders.value = results.map((r) => r.value);
+	genderLoading.value = false;
+}
+
 // Service is scoped to the chosen service type, so reset it when the type changes.
 function onServiceTypeChange() {
-	model.service = null;
+	appt.service = null;
 	options.service = [];
-	if (model.service_type) searchLink("service", "Item", "", { item_group: model.service_type }, "item_name");
+	if (appt.service_type) searchLink("service", "Item", "", { item_group: appt.service_type }, "item_name");
+}
+
+async function nextStep() {
+	const { valid } = await step1Form.value.validate();
+	if (valid) step.value = 2;
 }
 
 async function save() {
-	const { valid } = await form.value.validate();
+	const { valid } = await step2Form.value.validate();
 	if (!valid) return;
 
 	saving.value = true;
 	try {
-		const name = await call("create_appointment", { ...model });
+		// A brand-new patient is created first; its Customer id becomes the appointment's customer.
+		let customerId = customer.value;
+		if (isNew.value) {
+			customerId = await call("create_patient", { ...patient });
+			notifySuccess(__("Patient {0} created", [customerId]));
+		}
+		const name = await call("create_appointment", { ...appt, customer: customerId });
 		notifySuccess(__("Appointment {0} created", [name]));
 		emit("created");
 	} finally {
@@ -169,5 +276,6 @@ onMounted(() => {
 	searchLink("customer", "Customer", "", {}, "customer_name");
 	searchLink("employee", "Employee", "", {}, "employee_name");
 	searchLink("service_type", "Item Group", "", serviceTypeFilters.value, "name");
+	searchGenders("");
 });
 </script>
