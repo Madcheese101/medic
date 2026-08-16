@@ -1,5 +1,5 @@
 <template>
-	<v-card>
+	<v-card v-if="!creating">
 		<v-card-text class="d-flex flex-wrap align-center ga-3">
 			<v-autocomplete
 				v-model="filters.customer"
@@ -44,7 +44,7 @@
 			<v-btn color="primary" variant="tonal" prepend-icon="mdi-calendar-account" class="mr-2" @click="sessionOpen = true">
 				{{ __("New Session") }}
 			</v-btn>
-			<v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="newOpen = true">
+			<v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="creating = true">
 				{{ __("New Appointment") }}
 			</v-btn>
 		</v-card-text>
@@ -92,7 +92,8 @@
 		</v-data-table>
 	</v-card>
 
-	<NewAppointmentDialog v-model="newOpen" @created="load" />
+	<NewAppointmentForm v-else @created="onCreated" @cancel="creating = false" />
+
 	<NewSessionDialog v-model="sessionOpen" @created="load" />
 </template>
 
@@ -100,14 +101,14 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { call, notifySuccess, searchLinkOptions } from "../client.js";
 import { APPOINTMENT_STATUS, appointmentStatusColor } from "../constants.js";
-import NewAppointmentDialog from "../components/NewAppointmentDialog.vue";
+import NewAppointmentForm from "../components/NewAppointmentForm.vue";
 import NewSessionDialog from "../components/NewSessionDialog.vue";
 
 const emit = defineEmits(["navigate"]);
 
 const rows = ref([]);
 const loading = ref(false);
-const newOpen = ref(false);
+const creating = ref(false);
 const sessionOpen = ref(false);
 const checkingIn = ref(null);
 const customerOptions = ref([]);
@@ -154,6 +155,11 @@ async function load() {
 
 function view(name) {
 	emit("navigate", "appointment", { name });
+}
+
+function onCreated() {
+	creating.value = false;
+	load();
 }
 
 async function checkIn(name) {
