@@ -25,7 +25,7 @@
 			/>
 			<v-select
 				v-model="filters.status"
-				:items="['Active', 'Completed', 'Cancelled']"
+				:items="['Pending', 'Active', 'Completed', 'Cancelled']"
 				:label="__('Status')"
 				clearable
 				style="max-width: 180px"
@@ -52,6 +52,17 @@
 			<template #item.paid="{ item }">{{ Math.round((item.paid_pct || 0) * 100) }}%</template>
 			<template #item.actions="{ item }">
 				<v-btn
+					v-if="!item.invoice"
+					size="small"
+					variant="tonal"
+					color="primary"
+					icon="mdi-receipt-text-plus-outline"
+					:title="__('Create Invoice')"
+					:loading="creatingInvoice === item.name"
+					class="mr-1"
+					@click="createInvoice(item.name)"
+				/>
+				<v-btn
 					size="small"
 					variant="tonal"
 					color="primary"
@@ -69,7 +80,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { call, searchLinkOptions } from "../client.js";
+import { call, notifySuccess, searchLinkOptions } from "../client.js";
 import { treatmentStatusColor } from "../constants.js";
 import NewTreatmentDialog from "../components/NewTreatmentDialog.vue";
 import TreatmentDialog from "../components/TreatmentDialog.vue";
@@ -79,6 +90,7 @@ const loading = ref(false);
 const newOpen = ref(false);
 const detailOpen = ref(false);
 const selected = ref(null);
+const creatingInvoice = ref(null);
 const customerOptions = ref([]);
 const employeeOptions = ref([]);
 const filters = reactive({ customer: null, employee: null, status: null });
@@ -115,6 +127,17 @@ async function load() {
 function openPlan(name) {
 	selected.value = name;
 	detailOpen.value = true;
+}
+
+async function createInvoice(name) {
+	creatingInvoice.value = name;
+	try {
+		await call("create_treatment_plan_invoice", { name });
+		notifySuccess(__("Invoice created"));
+		await load();
+	} finally {
+		creatingInvoice.value = null;
+	}
 }
 
 onMounted(() => {

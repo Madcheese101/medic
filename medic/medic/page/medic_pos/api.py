@@ -413,9 +413,9 @@ DEPOSIT_PCT = 0.2
 
 
 def _invoice_financials(invoice):
-	"""Money snapshot for a plan's Sales Invoice. No invoice => treated as fully paid."""
+	"""Money snapshot for a plan's Sales Invoice. No invoice => nothing billed or paid yet."""
 	if not invoice:
-		return {"grand_total": 0.0, "paid": 0.0, "outstanding_amount": 0.0, "paid_pct": 1.0}
+		return {"grand_total": 0.0, "paid": 0.0, "outstanding_amount": 0.0, "paid_pct": 0.0}
 	si = frappe.db.get_value(
 		"Sales Invoice", invoice, ["grand_total", "outstanding_amount"], as_dict=True
 	)
@@ -430,8 +430,31 @@ def _invoice_financials(invoice):
 	}
 
 
+# Shared by the list endpoints. The invoice.* fields LEFT JOIN the plan's Sales Invoice
+TREATMENT_PLAN_JOIN_FIELDS = (
+	"name", "status", "customer", "customer.customer_name as customer_name",
+	"employee", "employee.employee_name as doctor_name",
+	"service", "total_sessions", "completed_sessions", "invoice",
+	"invoice.grand_total as grand_total", "invoice.outstanding_amount as outstanding_amount",
+)
+
+
+def _apply_financials(row):
+	"""Derive paid/paid_pct from the joined invoice totals. No invoice => NULLs => zeros."""
+	grand = flt(row.get("grand_total"))
+	outstanding = flt(row.get("outstanding_amount"))
+	row["grand_total"] = grand
+	row["outstanding_amount"] = outstanding
+	row["paid"] = grand - outstanding
+	row["paid_pct"] = ((grand - outstanding) / grand) if grand else 0.0
+	return row
+
+
 def _session_gate_ok(plan, is_last):
 	"""Two waivers live here: per-plan skip_deposit and per-customer allow_credit."""
+	# No invoice means no payment can have been made, so the gate stays shut.
+	if not plan.invoice:
+		return False
 	fin = _invoice_financials(plan.invoice)
 	if is_last:
 		if fin["outstanding_amount"] <= 0:
@@ -451,7 +474,8 @@ def create_treatment_plan(customer, employee, service, total_sessions, notes=Non
 	plan = frappe.new_doc("Treatment Plan")
 	plan.update(
 		{
-			"status": "Active",
+			# Stays Pending until its invoice is created, which activates it.
+			"status": "Pending",
 			"customer": customer,
 			"employee": employee,
 			"service": service,
@@ -461,17 +485,29 @@ def create_treatment_plan(customer, employee, service, total_sessions, notes=Non
 	)
 	plan.insert()
 	plan.submit()
+	return plan.name
 
-	# One submitted invoice for the whole plan; payments ride on it as Payment Entries.
+
+@frappe.whitelist()
+def create_treatment_plan_invoice(name):
+	"""Create the plan's Sales Invoice on demand; one invoice carries the whole plan."""
+	plan = frappe.get_doc("Treatment Plan", name)
+	if plan.invoice:
+		frappe.throw(_("This plan already has an invoice."))
+
 	si = frappe.new_doc("Sales Invoice")
-	si.customer = customer
+	si.customer = plan.customer
 	si.company = _company()
-	si.append("items", {"item_code": service, "qty": total_sessions})
+	# Custom Link field on Sales Invoice recording which plan this invoice belongs to.
+	si.treatment_plan = plan.name
+	si.append("items", {"item_code": plan.service, "qty": plan.total_sessions})
 	si.insert()
 	si.submit()
 
 	plan.db_set("invoice", si.name)
-	return plan.name
+	if plan.status == "Pending":
+		plan.db_set("status", "Active")
+	return si.name
 
 
 def _plan_dict(plan):
@@ -484,16 +520,17 @@ def _plan_dict(plan):
 
 @frappe.whitelist()
 def get_treatment_plans(customer):
-	plans = frappe.get_all(
+	currency = _company_currency()
+	rows = frappe.qb.get_query(
 		"Treatment Plan",
+		fields=list(TREATMENT_PLAN_JOIN_FIELDS),
 		filters={"customer": customer, "docstatus": 1},
-		fields=[
-			"name", "status", "service", "employee",
-			"total_sessions", "completed_sessions", "invoice",
-		],
 		order_by="creation desc",
-	)
-	return [_plan_dict(p) for p in plans]
+	).run(as_dict=True)
+	for r in rows:
+		_apply_financials(r)
+		r["currency"] = currency
+	return rows
 
 
 @frappe.whitelist()
@@ -502,20 +539,17 @@ def get_active_treatment_plans(customer=None):
 	if customer:
 		filters["customer"] = customer
 
-	out = []
-	for p in frappe.get_all(
+	rows = frappe.qb.get_query(
 		"Treatment Plan",
+		fields=list(TREATMENT_PLAN_JOIN_FIELDS),
 		filters=filters,
-		fields=[
-			"name", "customer", "employee", "service",
-			"total_sessions", "completed_sessions", "invoice",
-		],
-	):
-		if cint(p.completed_sessions) >= cint(p.total_sessions):
+	).run(as_dict=True)
+	out = []
+	for r in rows:
+		if cint(r.get("completed_sessions")) >= cint(r.get("total_sessions")):
 			continue  # no sessions left to book
-		p["customer_name"] = frappe.db.get_value("Customer", p.customer, "customer_name")
-		p.update(_invoice_financials(p.invoice))
-		out.append(p)
+		_apply_financials(r)
+		out.append(r)
 	return out
 
 
@@ -532,17 +566,13 @@ def list_treatment_plans(customer=None, employee=None, status=None, limit=100):
 
 	rows = frappe.qb.get_query(
 		"Treatment Plan",
-		fields=[
-			"name", "customer", "customer.customer_name as customer_name",
-			"employee", "employee.employee_name as doctor_name",
-			"service", "status", "total_sessions", "completed_sessions", "invoice",
-		],
+		fields=list(TREATMENT_PLAN_JOIN_FIELDS),
 		filters=filters,
 		order_by="creation desc",
 		limit=limit,
 	).run(as_dict=True)
 	for r in rows:
-		r.update(_invoice_financials(r.get("invoice")))
+		_apply_financials(r)
 	return rows
 
 
@@ -605,6 +635,9 @@ def _update_appointment_status(sales_invoice):
 @frappe.whitelist()
 def create_session(treatment_plan):
 	plan = frappe.get_doc("Treatment Plan", treatment_plan)
+	if not plan.invoice:
+		frappe.throw(_("Create the plan invoice before adding sessions."))
+
 	session_no = frappe.db.count("Patient Appointment", {"treatment_plan": treatment_plan}) + 1
 	if session_no > cint(plan.total_sessions):
 		frappe.throw(_("All sessions for this plan have already been created."))

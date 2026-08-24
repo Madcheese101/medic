@@ -11,7 +11,7 @@ export function appointmentStatusColor(status) {
 }
 
 export function treatmentStatusColor(status) {
-	return { Active: "primary", Completed: "success", Cancelled: "error" }[status] || "surface-variant";
+	return { Pending: "warning", Active: "primary", Completed: "success", Cancelled: "error" }[status] || "surface-variant";
 }
 
 // Mirrors the Sales Invoice status Select options.

@@ -30,7 +30,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Active\nCompleted\nCancelled"
+   "options": "Pending\nActive\nCompleted\nCancelled"
   },
   {
    "fieldname": "customer",
@@ -113,7 +113,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-10 02:40:48.809168",
+ "modified": "2026-08-24 14:00:21.966746",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Treatment Plan",

@@ -35,7 +35,18 @@
 						{{ __("Sessions") }}: {{ plan.completed_sessions || 0 }} / {{ plan.total_sessions }}
 					</v-chip>
 					<v-spacer />
-					<v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-cash-plus" @click="payOpen = true">
+					<v-btn
+						v-if="!plan.invoice"
+						size="small"
+						variant="tonal"
+						color="primary"
+						prepend-icon="mdi-receipt-text-plus-outline"
+						:loading="creatingInvoice"
+						@click="createInvoice"
+					>
+						{{ __("Create Invoice") }}
+					</v-btn>
+					<v-btn v-else size="small" variant="tonal" color="primary" prepend-icon="mdi-cash-plus" @click="payOpen = true">
 						{{ __("Add Payment") }}
 					</v-btn>
 					<v-btn
@@ -43,6 +54,7 @@
 						variant="flat"
 						color="primary"
 						prepend-icon="mdi-plus"
+						:disabled="!plan.invoice"
 						:loading="addingSession"
 						@click="addSession"
 					>
@@ -176,6 +188,7 @@ const { mobile } = useDisplay();
 const loading = ref(false);
 const addingSession = ref(false);
 const checkingIn = ref(null);
+const creatingInvoice = ref(false);
 const plan = ref({ sessions: [] });
 
 const payOpen = ref(false);
@@ -211,6 +224,18 @@ async function addSession() {
 		emit("changed");
 	} finally {
 		addingSession.value = false;
+	}
+}
+
+async function createInvoice() {
+	creatingInvoice.value = true;
+	try {
+		await call("create_treatment_plan_invoice", { name: props.name });
+		notifySuccess(__("Invoice created"));
+		await load();
+		emit("changed");
+	} finally {
+		creatingInvoice.value = false;
 	}
 }
 
