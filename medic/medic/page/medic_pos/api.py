@@ -238,6 +238,8 @@ APPOINTMENT_LIST_FIELDS = (
 	"service",
 	"appointment_status",
 	"invoice",
+	"treatment_plan",
+	"queue",
 	"docstatus",
 )
 
@@ -298,14 +300,15 @@ def get_appointment(name):
 	return data
 
 
-@frappe.whitelist()
-def confirm_appointment(name):
-	"""Create the draft Sales Invoice for a Pending appointment and mark it Not Confirmed."""
-	pa = frappe.get_doc("Patient Appointment", name)
-	if pa.docstatus != 1:
-		frappe.throw(_("Appointment must be submitted before confirming."))
-	if pa.appointment_status != "انتظار":
-		frappe.throw(_("Appointment is already confirmed."))
+def _company_currency():
+	company = _company()
+	return frappe.db.get_value("Company", company, "default_currency") if company else None
+
+
+def _ensure_appointment_invoice(pa):
+	"""Return the appointment's Sales Invoice, creating a draft one if missing. Idempotent."""
+	if pa.invoice:
+		return pa.invoice
 
 	si = frappe.new_doc("Sales Invoice")
 	si.customer = pa.customer
@@ -317,8 +320,82 @@ def confirm_appointment(name):
 
 	# invoice / appointment_status are read-only on a submitted doc; db_set bypasses that.
 	pa.db_set("invoice", si.name)
-	pa.db_set("appointment_status", "غير مؤكد")
-	return {"invoice": si.name, "appointment_status": "غير مؤكد"}
+	if pa.appointment_status == "انتظار":
+		pa.db_set("appointment_status", "غير مؤكد")
+	return si.name
+
+
+@frappe.whitelist()
+def confirm_appointment(name):
+	"""Create the draft Sales Invoice for a Pending appointment and mark it Not Confirmed."""
+	pa = frappe.get_doc("Patient Appointment", name)
+	if pa.docstatus != 1:
+		frappe.throw(_("Appointment must be submitted before confirming."))
+	if pa.appointment_status != "انتظار":
+		frappe.throw(_("Appointment is already confirmed."))
+
+	invoice = _ensure_appointment_invoice(pa)
+	return {"invoice": invoice, "appointment_status": "غير مؤكد"}
+
+
+@frappe.whitelist()
+def confirm_appointment_invoice(name):
+	"""Ensure the appointment has an invoice; return its money snapshot for the pay dialog."""
+	pa = frappe.get_doc("Patient Appointment", name)
+	if pa.docstatus != 1:
+		frappe.throw(_("Appointment must be submitted before confirming."))
+
+	invoice = _ensure_appointment_invoice(pa)
+	si = frappe.get_doc("Sales Invoice", invoice)
+	grand = flt(si.grand_total)
+	# outstanding_amount is only populated once the invoice is submitted; a draft owes it all.
+	outstanding = grand if si.docstatus == 0 else flt(si.outstanding_amount)
+	return {
+		"invoice": invoice,
+		"grand_total": grand,
+		"outstanding_amount": outstanding,
+		"paid": grand - outstanding,
+		"currency": _company_currency(),
+		"appointment_status": pa.appointment_status,
+	}
+
+
+@frappe.whitelist()
+def pay_appointment(name, amount, mode_of_payment, reference_no=None, reference_date=None):
+	"""Submit the appointment's invoice (if draft) and record a payment; confirm when fully paid."""
+	pa = frappe.get_doc("Patient Appointment", name)
+	if pa.docstatus != 1:
+		frappe.throw(_("Appointment must be submitted before paying."))
+
+	invoice = _ensure_appointment_invoice(pa)
+	si = frappe.get_doc("Sales Invoice", invoice)
+	if si.docstatus == 0:
+		# Submitting unpaid leaves the status غير مؤكد (the events hook returns early);
+		# the payment below reduces the outstanding, and we flip to مؤكد once it clears.
+		si.submit()
+
+	add_payment(invoice, amount, mode_of_payment, reference_no, reference_date)
+
+	outstanding = flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))
+	if outstanding <= 0 and pa.appointment_status != "مؤكد":
+		pa.db_set("appointment_status", "مؤكد")
+	return {
+		"invoice": invoice,
+		"outstanding_amount": outstanding,
+		"appointment_status": "مؤكد" if outstanding <= 0 else pa.appointment_status,
+	}
+
+
+@frappe.whitelist()
+def complete_appointment(name):
+	"""Mark a checked-in appointment as completed (مكتمل)."""
+	pa = frappe.get_doc("Patient Appointment", name)
+	if pa.docstatus != 1:
+		frappe.throw(_("Appointment must be submitted."))
+	if not pa.queue:
+		frappe.throw(_("Appointment must be checked in before completing."))
+	pa.db_set("appointment_status", "مكتمل")
+	return {"appointment_status": "مكتمل"}
 
 
 @frappe.whitelist()
@@ -483,11 +560,25 @@ def get_treatment_plan(name):
 
 
 @frappe.whitelist()
+def get_payment_modes():
+	"""Enabled Modes of Payment with their type, so the dialog knows when to require a reference."""
+	return frappe.get_all(
+		"Mode of Payment", filters={"enabled": 1}, fields=["name", "type"], order_by="name"
+	)
+
+
+@frappe.whitelist()
 def add_payment(invoice, amount, mode_of_payment, reference_no=None, reference_date=None):
 	from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
-
 	pe = get_payment_entry("Sales Invoice", invoice, party_amount=flt(amount))
 	pe.mode_of_payment = mode_of_payment
+	# get_payment_entry defaults paid_to to the company account, which may be a Bank type and
+	# would then demand a reference. Use the mode's own account so a Cash mode stays Cash.
+	account = frappe.db.get_value(
+		"Mode of Payment Account", {"parent": mode_of_payment, "company": pe.company}, "default_account"
+	)
+	if account:
+		pe.paid_to = account
 	# Bank-type modes require a reference; the dialog collects it for those.
 	if reference_no:
 		pe.reference_no = reference_no
@@ -495,8 +586,21 @@ def add_payment(invoice, amount, mode_of_payment, reference_no=None, reference_d
 		pe.reference_date = reference_date
 	pe.insert()
 	pe.submit()
+	_update_appointment_status(invoice)
 	return pe.name
 
+def _update_appointment_status(sales_invoice):
+	"""Update the appointment status based on the invoice's payment status."""
+	pa_name, outstanding = frappe.db.get_value("Sales Invoice", sales_invoice, "patient_appointment, outstanding_amount")
+	if not pa_name:
+		return
+	try:
+		pa = frappe.get_doc("Patient Appointment", pa_name)
+	except frappe.DoesNotExistError:
+		return
+	if pa.appointment_status == "مؤكد" or pa.treatment_plan: return
+	if outstanding == 0 and pa.appointment_status == "غير مؤكد":
+		pa.db_set("appointment_status", "مؤكد")
 
 @frappe.whitelist()
 def create_session(treatment_plan):
@@ -506,7 +610,8 @@ def create_session(treatment_plan):
 		frappe.throw(_("All sessions for this plan have already been created."))
 
 	is_last = session_no == cint(plan.total_sessions)
-	if is_last and not _session_gate_ok(plan, is_last=True):
+	gate_ok = _session_gate_ok(plan, is_last)
+	if is_last and not gate_ok:
 		frappe.throw(_("The plan invoice must be fully paid before the last session."))
 
 	doc = frappe.new_doc("Patient Appointment")
@@ -521,7 +626,8 @@ def create_session(treatment_plan):
 			"service": plan.service,
 			"treatment_plan": plan.name,
 			"session_no": session_no,
-			"appointment_status": "انتظار",
+			# A session that already meets the plan's payment gate is ready to serve.
+			"appointment_status": "مؤكد" if gate_ok else "انتظار",
 		}
 	)
 	doc.insert()
@@ -530,6 +636,7 @@ def create_session(treatment_plan):
 
 
 def _next_queue(employee, appointment_date):
+
 	taken = frappe.get_all(
 		"Patient Appointment",
 		filters={"employee": employee, "appointment_date": appointment_date, "queue": [">", 0]},
@@ -558,6 +665,9 @@ def check_in(appointment):
 	appt.db_set("queue", q)
 	if appt.treatment_plan:
 		plan.db_set("completed_sessions", cint(plan.completed_sessions) + 1)
+		# Queuing the session means its gate passed; reflect that on the appointment.
+		if appt.appointment_status != "مؤكد":
+			appt.db_set("appointment_status", "مؤكد")
 	return q
 
 
@@ -623,3 +733,78 @@ def custom_search_link(
 			row["label"] = labels[value]
 
 	return rows
+
+
+# ---------------------------------------------------------------- sales invoices
+
+SALES_INVOICE_LIST_FIELDS = (
+	"name",
+	"customer",
+	"customer_name",
+	"posting_date",
+	"grand_total",
+	"outstanding_amount",
+	"status",
+	"currency",
+)
+
+
+@frappe.whitelist()
+def get_sales_invoices(customer=None, status=None, from_date=None, to_date=None, limit=100):
+	"""Sales Invoice list for the company, filters applied on the DB."""
+	filters = {"company": _company()}
+	if customer:
+		filters["customer"] = customer
+	if status:
+		filters["status"] = status
+	if from_date and to_date:
+		filters["posting_date"] = ["between", [from_date, to_date]]
+	elif from_date:
+		filters["posting_date"] = [">=", from_date]
+	elif to_date:
+		filters["posting_date"] = ["<=", to_date]
+
+	return frappe.qb.get_query(
+		"Sales Invoice",
+		fields=list(SALES_INVOICE_LIST_FIELDS),
+		filters=filters,
+		order_by="posting_date desc, creation desc",
+		limit=limit,
+	).run(as_dict=True)
+
+
+@frappe.whitelist()
+def get_sales_invoice(name):
+	"""Header, line items and payment history for the invoice details dialog."""
+	si = frappe.get_doc("Sales Invoice", name)
+	data = {field: si.get(field) for field in SALES_INVOICE_LIST_FIELDS}
+	data["items"] = [
+		{
+			"item_code": row.item_code,
+			"item_name": row.item_name,
+			"qty": row.qty,
+			"rate": row.rate,
+			"amount": row.amount,
+		}
+		for row in si.items
+	]
+
+	refs = frappe.get_all(
+		"Payment Entry Reference",
+		filters={"reference_doctype": "Sales Invoice", "reference_name": name, "docstatus": 1},
+		fields=["parent", "allocated_amount"],
+	)
+	payments = []
+	for ref in refs:
+		pe = frappe.db.get_value(
+			"Payment Entry", ref.parent, ["posting_date", "mode_of_payment"], as_dict=True
+		)
+		payments.append(
+			{
+				"posting_date": pe.posting_date if pe else None,
+				"mode_of_payment": pe.mode_of_payment if pe else None,
+				"allocated_amount": ref.allocated_amount,
+			}
+		)
+	data["payments"] = payments
+	return data

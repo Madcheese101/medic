@@ -12,6 +12,14 @@
 			<v-divider />
 
 			<v-card-text>
+				<v-text-field
+					:model-value="plan.invoice"
+					:label="__('Invoice')"
+					prepend-inner-icon="mdi-receipt-text-outline"
+					readonly
+					class="mb-3"
+				/>
+
 				<!-- Payment progress -->
 				<div class="d-flex align-center justify-space-between mb-1">
 					<span class="text-body-2">
@@ -49,6 +57,7 @@
 					<thead>
 						<tr>
 							<th>#</th>
+							<th>{{ __("Appointment") }}</th>
 							<th>{{ __("Date") }}</th>
 							<th>{{ __("Status") }}</th>
 							<th>{{ __("Queue") }}</th>
@@ -58,6 +67,7 @@
 					<tbody>
 						<tr v-for="s in plan.sessions" :key="s.name">
 							<td>{{ s.session_no }}</td>
+							<td>{{ s.name }}</td>
 							<td>{{ formatDate(s.appointment_date) }}</td>
 							<td>
 								<v-chip size="x-small" variant="tonal" :color="appointmentStatusColor(s.appointment_status)">
@@ -80,7 +90,7 @@
 							</td>
 						</tr>
 						<tr v-if="!plan.sessions || !plan.sessions.length">
-							<td colspan="5" class="text-medium-emphasis">{{ __("No sessions yet") }}</td>
+							<td colspan="6" class="text-medium-emphasis">{{ __("No sessions yet") }}</td>
 						</tr>
 					</tbody>
 				</v-table>

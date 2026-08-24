@@ -81,6 +81,17 @@
 			</template>
 			<template #item.actions="{ item }">
 				<v-btn
+					v-if="item.docstatus === 1 && !item.invoice && !item.treatment_plan"
+					size="small"
+					variant="tonal"
+					color="primary"
+					icon="mdi-cash-register"
+					:title="__('Confirm & Pay')"
+					:loading="confirming === item.name"
+					class="mr-1"
+					@click="confirmAndPay(item.name)"
+				/>
+				<v-btn
 					size="small"
 					variant="tonal"
 					color="primary"
@@ -95,6 +106,17 @@
 	<NewAppointmentForm v-else @created="onCreated" @cancel="creating = false" />
 
 	<NewSessionDialog v-model="sessionOpen" @created="load" />
+
+	<PaymentDialog
+		v-model="payOpen"
+		:title="__('Confirm & Pay')"
+		:grand-total="payTarget.grand_total"
+		:outstanding="payTarget.outstanding_amount"
+		:currency="payTarget.currency"
+		method="pay_appointment"
+		:extra-args="{ name: payTarget.name }"
+		@paid="load"
+	/>
 </template>
 
 <script setup>
@@ -103,6 +125,7 @@ import { call, notifySuccess, searchLinkOptions } from "../client.js";
 import { APPOINTMENT_STATUS, appointmentStatusColor } from "../constants.js";
 import NewAppointmentForm from "../components/NewAppointmentForm.vue";
 import NewSessionDialog from "../components/NewSessionDialog.vue";
+import PaymentDialog from "../components/PaymentDialog.vue";
 
 const emit = defineEmits(["navigate"]);
 
@@ -111,6 +134,9 @@ const loading = ref(false);
 const creating = ref(false);
 const sessionOpen = ref(false);
 const checkingIn = ref(null);
+const confirming = ref(null);
+const payOpen = ref(false);
+const payTarget = ref({});
 const customerOptions = ref([]);
 const employeeOptions = ref([]);
 const filters = reactive({
@@ -155,6 +181,18 @@ async function load() {
 
 function view(name) {
 	emit("navigate", "appointment", { name });
+}
+
+// Ensure the invoice exists (the "confirm" step), then open the pay dialog with its totals.
+async function confirmAndPay(name) {
+	confirming.value = name;
+	try {
+		const fin = await call("confirm_appointment_invoice", { name });
+		payTarget.value = { name, ...fin };
+		payOpen.value = true;
+	} finally {
+		confirming.value = null;
+	}
 }
 
 function onCreated() {

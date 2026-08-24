@@ -107,6 +107,7 @@ const navItems = [
 	{ value: "patients", title: "Patients", icon: "mdi-account-injury-outline" },
 	{ value: "appointments", title: "Appointments", icon: "mdi-calendar-check-outline" },
 	{ value: "treatments", title: "Treatments", icon: "mdi-clipboard-pulse-outline" },
+	{ value: "invoices", title: "Invoices", icon: "mdi-receipt-text-outline" },
 ];
 
 const router = useRouter();
