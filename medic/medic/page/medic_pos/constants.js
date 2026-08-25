@@ -8,6 +8,33 @@ export const APPOINTMENT_TYPES = ["كشف", "علاج", "مراجعة", "متا�
 export const ACTION_TYPES = ["علاج", "تحليل", "وصفة طبية"];
 export const APPOINTMENT_STATUS = ["انتظار", "غير مؤكد", "مؤكد", "مكتمل"];
 
+// Mirrors the Prescription Items Select options (the blank first route option is dropped).
+export const PRESCRIPTION_ROUTES = [
+	"Oral",
+	"Sublingual",
+	"Buccal",
+	"Rectal",
+	"Vaginal",
+	"Intravenous",
+	"Intramuscular",
+	"Subcutaneous",
+	"Intradermal",
+	"Intrathecal",
+	"Epidural",
+	"Intra-articular",
+	"Topical",
+	"Transdermal",
+	"Ophthalmic",
+	"Otic",
+	"Nasal",
+	"Inhalation",
+	"Nebulization",
+	"Intravesical",
+	"Nasogastric",
+	"Gastrostomy",
+];
+export const PRESCRIPTION_PER = ["Day", "Week"];
+
 // انتظار Pending, غير مؤكد Not Confirmed, مؤكد Confirmed, مكتمل Completed.
 export function appointmentStatusColor(status) {
 	return { انتظار: "warning", "غير مؤكد": "info", مؤكد: "success", مكتمل: "primary" }[status] || "surface-variant";

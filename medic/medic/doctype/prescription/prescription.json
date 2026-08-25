@@ -8,7 +8,8 @@
   "posting_date",
   "patient",
   "appointment",
-  "items"
+  "items",
+  "invoice_created"
  ],
  "fields": [
   {
@@ -38,12 +39,18 @@
    "fieldtype": "Table",
    "label": "Items",
    "options": "Prescription Items"
+  },
+  {
+   "default": "0",
+   "fieldname": "invoice_created",
+   "fieldtype": "Check",
+   "label": "Invoice Created"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-23 15:30:51.647080",
+ "modified": "2026-08-25 21:21:45.013595",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Prescription",

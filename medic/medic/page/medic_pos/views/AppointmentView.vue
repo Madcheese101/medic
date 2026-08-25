@@ -1,5 +1,5 @@
 <template>
-	<v-card :loading="loading">
+	<v-card v-if="!prescribing" :loading="loading">
 		<v-card-title class="d-flex align-center">
 			<v-btn
 				variant="text"
@@ -158,6 +158,16 @@
 							>
 								{{ __("Confirm & Pay") }}
 							</v-btn>
+							<v-btn
+								v-if="row.action_type === 'وصفة طبية'"
+								size="small"
+								variant="tonal"
+								color="primary"
+								prepend-icon="mdi-prescription"
+								@click="viewPrescription(row)"
+							>
+								{{ __("View") }}
+							</v-btn>
 						</td>
 					</tr>
 					<tr v-if="!doc.actions || !doc.actions.length">
@@ -167,6 +177,15 @@
 			</v-table>
 		</v-card-text>
 	</v-card>
+
+	<PrescriptionForm
+		v-else
+		:appointment="doc.name"
+		:patient="doc.customer_name"
+		:prescription="openPrescription"
+		@saved="closePrescription"
+		@cancel="closePrescription"
+	/>
 
 	<AppointmentActionDialog
 		v-model="actionOpen"
@@ -193,6 +212,7 @@ import { useRtl } from "vuetify";
 import { call, confirmAction, notifySuccess } from "../client.js";
 import { ACTION_TYPES, appointmentStatusColor } from "../constants.js";
 import AppointmentActionDialog from "../components/AppointmentActionDialog.vue";
+import PrescriptionForm from "../components/PrescriptionForm.vue";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 
 const props = defineProps({ name: { type: String, default: null } });
@@ -207,6 +227,8 @@ const savingNotes = ref(false);
 const actionOpen = ref(false);
 const selectedActionType = ref(null);
 const payOpen = ref(false);
+const prescribing = ref(false);
+const openPrescription = ref(null);
 const payTarget = ref({});
 const doc = ref({});
 const doctorName = ref("");
@@ -270,8 +292,26 @@ async function checkIn() {
 
 // The dropdown picks the action type; the dialog then only asks for the service.
 function openAction(actionType) {
+	// Prescriptions are not billable, so they get their own inline form instead of the invoice dialog.
+	if (actionType === "وصفة طبية") {
+		openPrescription.value = null;
+		prescribing.value = true;
+		return;
+	}
 	selectedActionType.value = actionType;
 	actionOpen.value = true;
+}
+
+// The row's invoice field carries the Prescription name; the form decides view vs. edit from invoice_created.
+function viewPrescription(row) {
+	openPrescription.value = row.invoice;
+	prescribing.value = true;
+}
+
+async function closePrescription() {
+	prescribing.value = false;
+	openPrescription.value = null;
+	await load();
 }
 
 // علاج actions are paid in full; the row carries its invoice totals from get_appointment.

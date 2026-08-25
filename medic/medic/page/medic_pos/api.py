@@ -300,7 +300,8 @@ def get_appointment(name):
 	# Each action row carries its own invoice's totals so the table/pay dialog have amounts.
 	currency = _company_currency()
 	for row in data.get("actions") or []:
-		fin = _invoice_financials(row.get("invoice"))
+		# Prescription rows are not billable and carry no Sales Invoice.
+		fin = _invoice_financials(row.get("invoice") if row.get("invoice_type") == "Sales Invoice" else None)
 		row["grand_total"] = fin["grand_total"]
 		row["outstanding_amount"] = fin["outstanding_amount"]
 		row["currency"] = currency
@@ -439,6 +440,72 @@ def create_appointment_action(name, service, action_type):
 	)
 	pa.save()
 	return si.name
+
+
+def _set_prescription_items(doc, items):
+	doc.set("items", [])
+	for row in items:
+		doc.append(
+			"items",
+			{
+				"item": row.get("item"),
+				"route": row.get("route"),
+				"times": cint(row.get("times")),
+				"per": row.get("per"),
+				"for": cint(row.get("for")),
+			},
+		)
+
+
+@frappe.whitelist()
+def create_prescription(appointment, items):
+	"""Prescription for the appointment's patient, recorded as a non-billable action row.
+	`items`: list of {item, route, times, per, for}."""
+	items = frappe.parse_json(items) or []
+	if not items:
+		frappe.throw(_("Add at least one item."))
+
+	pa = frappe.get_doc("Patient Appointment", appointment)
+	if pa.docstatus != 1:
+		frappe.throw(_("Appointment must be submitted."))
+	if pa.appointment_status == "مكتمل":
+		frappe.throw(_("Appointment is already completed."))
+
+	doc = frappe.new_doc("Prescription")
+	doc.posting_date = today()
+	doc.patient = pa.customer
+	doc.appointment = pa.name
+	_set_prescription_items(doc, items)
+	doc.insert()
+
+	# Nothing to collect on a prescription, so the row is born paid.
+	pa.append(
+		"actions",
+		{"invoice": doc.name, "invoice_type": "Prescription", "action_type": "وصفة طبية", "paid": 1},
+	)
+	pa.save()
+	return doc.name
+
+
+@frappe.whitelist()
+def get_prescription(name):
+	return frappe.get_doc("Prescription", name).as_dict()
+
+
+@frappe.whitelist()
+def update_prescription(name, items):
+	"""Replace a prescription's items. Locked once the pharmacy has invoiced it."""
+	items = frappe.parse_json(items) or []
+	if not items:
+		frappe.throw(_("Add at least one item."))
+
+	doc = frappe.get_doc("Prescription", name)
+	if doc.invoice_created:
+		frappe.throw(_("This prescription has been invoiced and can no longer be edited."))
+
+	_set_prescription_items(doc, items)
+	doc.save()
+	return doc.name
 
 
 @frappe.whitelist()
