@@ -3,6 +3,9 @@ export const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 // Mirrors the Patient Appointment doctype Select options.
 export const APPOINTMENT_TYPES = ["كشف", "علاج", "مراجعة", "متابعة دورية"];
+
+// Mirrors the Appointment Actions action_type Select options.
+export const ACTION_TYPES = ["علاج", "تحليل", "وصفة طبية"];
 export const APPOINTMENT_STATUS = ["انتظار", "غير مؤكد", "مؤكد", "مكتمل"];
 
 // انتظار Pending, غير مؤكد Not Confirmed, مؤكد Confirmed, مكتمل Completed.

@@ -72,10 +72,31 @@
 			</v-card-text>
 			<v-divider />
 			<v-card-actions>
+				<v-btn
+					v-if="doc.is_action_invoice && doc.status === 'Draft'"
+					color="primary"
+					variant="flat"
+					prepend-icon="mdi-cash-register"
+					@click="payOpen = true"
+				>
+					{{ __("Pay") }}
+				</v-btn>
 				<v-spacer />
 				<v-btn variant="text" @click="open = false">{{ __("Close") }}</v-btn>
 			</v-card-actions>
 		</v-card>
+
+		<PaymentDialog
+			v-model="payOpen"
+			:title="__('Pay')"
+			:grand-total="doc.grand_total"
+			:outstanding="doc.outstanding_amount"
+			:currency="doc.currency"
+			full-only
+			method="pay_appointment_action"
+			:extra-args="{ invoice: doc.name }"
+			@paid="onPaid"
+		/>
 	</v-dialog>
 </template>
 
@@ -84,12 +105,13 @@ import { computed, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
 import { call, formatCurrency } from "../client.js";
 import { invoiceStatusColor } from "../constants.js";
+import PaymentDialog from "./PaymentDialog.vue";
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
 	name: { type: String, default: null },
 });
-const emit = defineEmits(["update:modelValue"]);
+const emit = defineEmits(["update:modelValue", "paid"]);
 
 const open = computed({
 	get: () => props.modelValue,
@@ -98,6 +120,7 @@ const open = computed({
 
 const { mobile } = useDisplay();
 const loading = ref(false);
+const payOpen = ref(false);
 const doc = ref({ items: [], payments: [] });
 
 function formatDate(value) {
@@ -111,6 +134,11 @@ async function load() {
 	} finally {
 		loading.value = false;
 	}
+}
+
+async function onPaid() {
+	await load();
+	emit("paid");
 }
 
 watch(open, (isOpen) => {

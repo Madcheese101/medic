@@ -105,7 +105,20 @@
 			</div>
 
 			<v-divider class="my-5" />
-			<div class="text-subtitle-2 text-medium-emphasis mb-2">{{ __("Actions") }}</div>
+			<div class="d-flex align-center mb-2">
+				<div class="text-subtitle-2 text-medium-emphasis">{{ __("Actions") }}</div>
+				<v-spacer />
+				<v-btn
+					v-if="doc.docstatus === 1 && !isCompleted"
+					size="small"
+					variant="tonal"
+					color="primary"
+					prepend-icon="mdi-plus"
+					@click="actionOpen = true"
+				>
+					{{ __("Add Action") }}
+				</v-btn>
+			</div>
 			<v-table density="comfortable">
 				<thead>
 					<tr>
@@ -113,6 +126,7 @@
 						<th>{{ __("Invoice Type") }}</th>
 						<th>{{ __("Action Type") }}</th>
 						<th>{{ __("Paid") }}</th>
+						<th />
 					</tr>
 				</thead>
 				<tbody>
@@ -123,14 +137,44 @@
 						<td>
 							<v-icon :icon="row.paid ? 'mdi-check-circle' : 'mdi-close-circle-outline'" :color="row.paid ? 'success' : 'medium-emphasis'" />
 						</td>
+						<td class="text-end">
+							<v-btn
+								v-if="row.action_type === 'علاج' && !row.paid"
+								size="small"
+								variant="tonal"
+								color="primary"
+								prepend-icon="mdi-cash-register"
+								@click="payAction(row)"
+							>
+								{{ __("Confirm & Pay") }}
+							</v-btn>
+						</td>
 					</tr>
 					<tr v-if="!doc.actions || !doc.actions.length">
-						<td colspan="4" class="text-medium-emphasis">{{ __("No actions yet") }}</td>
+						<td colspan="5" class="text-medium-emphasis">{{ __("No actions yet") }}</td>
 					</tr>
 				</tbody>
 			</v-table>
 		</v-card-text>
 	</v-card>
+
+	<AppointmentActionDialog
+		v-model="actionOpen"
+		:appointment="doc.name"
+		:service-type="doc.service_type"
+		@created="load"
+	/>
+	<PaymentDialog
+		v-model="payOpen"
+		:title="__('Confirm & Pay')"
+		:grand-total="payTarget.grand_total"
+		:outstanding="payTarget.outstanding_amount"
+		:currency="payTarget.currency"
+		full-only
+		method="pay_appointment_action"
+		:extra-args="{ invoice: payTarget.invoice }"
+		@paid="load"
+	/>
 </template>
 
 <script setup>
@@ -138,6 +182,8 @@ import { computed, onMounted, ref } from "vue";
 import { useRtl } from "vuetify";
 import { call, confirmAction, notifySuccess } from "../client.js";
 import { appointmentStatusColor } from "../constants.js";
+import AppointmentActionDialog from "../components/AppointmentActionDialog.vue";
+import PaymentDialog from "../components/PaymentDialog.vue";
 
 const props = defineProps({ name: { type: String, default: null } });
 const emit = defineEmits(["back"]);
@@ -148,6 +194,9 @@ const confirming = ref(false);
 const checkingIn = ref(false);
 const completing = ref(false);
 const savingNotes = ref(false);
+const actionOpen = ref(false);
+const payOpen = ref(false);
+const payTarget = ref({});
 const doc = ref({});
 const doctorName = ref("");
 const notes = ref("");
@@ -206,6 +255,12 @@ async function checkIn() {
 	} finally {
 		checkingIn.value = false;
 	}
+}
+
+// علاج actions are paid in full; the row carries its invoice totals from get_appointment.
+function payAction(row) {
+	payTarget.value = row;
+	payOpen.value = true;
 }
 
 async function complete() {

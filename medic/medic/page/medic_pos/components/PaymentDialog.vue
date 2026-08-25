@@ -18,6 +18,7 @@
 
 				<v-form ref="form">
 					<v-text-field
+						v-if="!fullOnly"
 						v-model.number="payment.amount"
 						type="number"
 						min="0"
@@ -79,6 +80,8 @@ const props = defineProps({
 	// The whitelisted method to call, plus the fixed args identifying what is being paid.
 	method: { type: String, default: "add_payment" },
 	extraArgs: { type: Object, default: () => ({}) },
+	// Hide the amount field and always pay the full outstanding (action invoices).
+	fullOnly: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:modelValue", "paid"]);
 

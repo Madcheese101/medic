@@ -62,6 +62,16 @@
 			</template>
 			<template #item.actions="{ item }">
 				<v-btn
+					v-if="item.is_action_invoice && item.status === 'Draft'"
+					size="small"
+					variant="tonal"
+					color="primary"
+					icon="mdi-cash-register"
+					:title="__('Pay')"
+					class="mr-1"
+					@click="openPayAction(item)"
+				/>
+				<v-btn
 					v-if="item.outstanding_amount > 0 && item.status !== 'Draft'"
 					size="small"
 					variant="tonal"
@@ -94,7 +104,19 @@
 		@paid="load"
 	/>
 
-	<InvoiceDetailsDialog v-model="detailsOpen" :name="detailsName" />
+	<PaymentDialog
+		v-model="payActionOpen"
+		:title="__('Pay')"
+		:grand-total="payActionTarget.grand_total"
+		:outstanding="payActionTarget.outstanding_amount"
+		:currency="payActionTarget.currency"
+		full-only
+		method="pay_appointment_action"
+		:extra-args="{ invoice: payActionTarget.name }"
+		@paid="load"
+	/>
+
+	<InvoiceDetailsDialog v-model="detailsOpen" :name="detailsName" @paid="load" />
 </template>
 
 <script setup>
@@ -111,6 +133,8 @@ const filters = reactive({ customer: null, status: null, from_date: "", to_date:
 
 const payOpen = ref(false);
 const payTarget = ref({});
+const payActionOpen = ref(false);
+const payActionTarget = ref({});
 const detailsOpen = ref(false);
 const detailsName = ref(null);
 
@@ -144,6 +168,11 @@ async function load() {
 function openPay(item) {
 	payTarget.value = item;
 	payOpen.value = true;
+}
+
+function openPayAction(item) {
+	payActionTarget.value = item;
+	payActionOpen.value = true;
 }
 
 function openDetails(name) {

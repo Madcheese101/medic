@@ -6,6 +6,11 @@
  "engine": "InnoDB",
  "field_order": [
   "service_parent_item_group",
+  "enable_pharmacy",
+  "pharmacy_item_group",
+  "enable_test_lab",
+  "test_lab_item_group",
+  "column_break_ibqz",
   "doctors_default_designation"
  ],
  "fields": [
@@ -25,13 +30,45 @@
    "label": "Doctors Default Designation",
    "options": "Designation",
    "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_pharmacy",
+   "fieldtype": "Check",
+   "label": "Enable Pharmacy"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_test_lab",
+   "fieldtype": "Check",
+   "label": "Enable Test Lab"
+  },
+  {
+   "fieldname": "test_lab_item_group",
+   "fieldtype": "Link",
+   "label": "Test Lab Item Group",
+   "mandatory_depends_on": "eval:doc.enable_test_lab",
+   "options": "Item Group",
+   "read_only_depends_on": "eval:!doc.enable_test_lab"
+  },
+  {
+   "fieldname": "column_break_ibqz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pharmacy_item_group",
+   "fieldtype": "Link",
+   "label": "Pharmacy Item Group",
+   "mandatory_depends_on": "eval:doc.enable_pharmacy",
+   "options": "Item Group",
+   "read_only_depends_on": "eval:!doc.enable_pharmacy"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-07-18 14:45:00.230994",
+ "modified": "2026-08-24 15:42:00.592474",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Clinic Setup",

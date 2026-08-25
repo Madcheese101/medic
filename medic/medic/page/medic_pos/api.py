@@ -297,6 +297,13 @@ def get_appointment(name):
 	doc = frappe.get_doc("Patient Appointment", name)
 	data = doc.as_dict()
 	data["doctor_name"] = frappe.db.get_value("Employee", doc.employee, "employee_name")
+	# Each action row carries its own invoice's totals so the table/pay dialog have amounts.
+	currency = _company_currency()
+	for row in data.get("actions") or []:
+		fin = _invoice_financials(row.get("invoice"))
+		row["grand_total"] = fin["grand_total"]
+		row["outstanding_amount"] = fin["outstanding_amount"]
+		row["currency"] = currency
 	return data
 
 
@@ -396,6 +403,55 @@ def complete_appointment(name):
 		frappe.throw(_("Appointment must be checked in before completing."))
 	pa.db_set("appointment_status", "مكتمل")
 	return {"appointment_status": "مكتمل"}
+
+
+@frappe.whitelist()
+def create_appointment_action(name, service, action_type):
+	"""Draft Sales Invoice for an extra service (a different item group than the appointment's),
+	recorded as an action on the appointment and paid separately."""
+	pa = frappe.get_doc("Patient Appointment", name)
+	if pa.docstatus != 1:
+		frappe.throw(_("Appointment must be submitted."))
+	if pa.appointment_status == "مكتمل":
+		frappe.throw(_("Appointment is already completed."))
+
+	if frappe.db.get_value("Item", service, "item_group") == pa.service_type:
+		frappe.throw(_("Choose a service from a different type than the appointment's service."))
+
+	si = frappe.new_doc("Sales Invoice")
+	si.customer = pa.customer
+	si.company = _company()
+	# Reaches the PA via the events hook; is_action_invoice marks it separate from the main one.
+	si.patient_appointment = pa.name
+	si.is_action_invoice = 1
+	si.append("items", {"item_code": service, "qty": 1})
+	si.insert()  # draft (docstatus 0)
+
+	pa.append(
+		"actions",
+		{"invoice": si.name, "invoice_type": "Sales Invoice", "action_type": action_type, "paid": 0},
+	)
+	pa.save()
+	return si.name
+
+
+@frappe.whitelist()
+def pay_appointment_action(invoice, mode_of_payment, reference_no=None, reference_date=None):
+	"""Pay an action invoice IN FULL (submit it if draft), then mark its action row paid."""
+	si = frappe.get_doc("Sales Invoice", invoice)
+	if si.docstatus == 0:
+		si.submit()
+
+	outstanding = flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))
+	if outstanding > 0:
+		add_payment(invoice, outstanding, mode_of_payment, reference_no, reference_date)
+
+	# We submitted it unpaid, so the events hook's fully-paid branch was skipped; flip it here.
+	row = frappe.db.exists("Appointment Actions", {"invoice": invoice})
+	if row:
+		frappe.db.set_value("Appointment Actions", row, "paid", 1)
+
+	return {"invoice": invoice, "outstanding_amount": 0.0}
 
 
 @frappe.whitelist()
@@ -779,6 +835,7 @@ SALES_INVOICE_LIST_FIELDS = (
 	"outstanding_amount",
 	"status",
 	"currency",
+	"is_action_invoice",
 )
 
 
