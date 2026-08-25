@@ -116,62 +116,23 @@
 		</v-card>
 	</v-dialog>
 
-	<!-- Add Payment sub-dialog -->
-	<v-dialog v-model="payOpen" max-width="480" :retain-focus="false">
-		<v-card>
-			<v-card-title>{{ __("Add Payment") }}</v-card-title>
-			<v-divider />
-			<v-card-text>
-				<v-form ref="payForm">
-					<v-text-field
-						v-model.number="payment.amount"
-						type="number"
-						min="0"
-						:label="__('Amount')"
-						prepend-inner-icon="mdi-cash"
-						:rules="[required, positive]"
-					/>
-					<v-autocomplete
-						v-model="payment.mode_of_payment"
-						:items="modes"
-						:label="__('Mode of Payment')"
-						prepend-inner-icon="mdi-credit-card-outline"
-						:rules="[required]"
-						class="mt-3"
-						@update:search="searchModes"
-					/>
-					<v-text-field
-						v-model="payment.reference_no"
-						:label="__('Reference No (for bank/cheque)')"
-						prepend-inner-icon="mdi-pound"
-						class="mt-3"
-					/>
-					<v-text-field
-						v-model="payment.reference_date"
-						type="date"
-						:label="__('Reference Date')"
-						prepend-inner-icon="mdi-calendar"
-						class="mt-3"
-					/>
-				</v-form>
-			</v-card-text>
-			<v-divider />
-			<v-card-actions>
-				<v-spacer />
-				<v-btn variant="text" @click="payOpen = false">{{ __("Cancel") }}</v-btn>
-				<v-btn color="primary" variant="flat" :loading="paying" @click="submitPayment">
-					{{ __("Pay") }}
-				</v-btn>
-			</v-card-actions>
-		</v-card>
-	</v-dialog>
+	<SplitPaymentDialog
+		v-model="payOpen"
+		:title="__('Add Payment')"
+		:outstanding="plan.outstanding_amount"
+		:currency="plan.currency"
+		method="record_payments"
+		:extra-args="{ invoice: plan.invoice }"
+		@paid="onPaid"
+	/>
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
-import { call, customSearchLink, formatCurrency, notifySuccess } from "../client.js";
+import { call, formatCurrency, notifySuccess } from "../client.js";
 import { appointmentStatusColor, treatmentStatusColor } from "../constants.js";
+import SplitPaymentDialog from "./SplitPaymentDialog.vue";
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -192,15 +153,8 @@ const creatingInvoice = ref(false);
 const plan = ref({ sessions: [] });
 
 const payOpen = ref(false);
-const payForm = ref(null);
-const paying = ref(false);
-const modes = ref([]);
-const payment = reactive({ amount: null, mode_of_payment: null, reference_no: "", reference_date: "" });
 
 const paidPct = computed(() => (plan.value.paid_pct || 0) * 100);
-
-const required = (v) => (v !== null && v !== "" && v !== undefined) || __("Required");
-const positive = (v) => v > 0 || __("Must be greater than 0");
 
 function formatDate(value) {
 	return value ? frappe.datetime.str_to_user(value) : "";
@@ -251,40 +205,12 @@ async function checkIn(appointment) {
 	}
 }
 
-async function searchModes(txt) {
-	const rows = await customSearchLink("Mode of Payment", txt);
-	modes.value = rows.map((r) => r.value);
-}
-
-async function submitPayment() {
-	const { valid } = await payForm.value.validate();
-	if (!valid) return;
-
-	paying.value = true;
-	try {
-		await call("add_payment", {
-			invoice: plan.value.invoice,
-			amount: payment.amount,
-			mode_of_payment: payment.mode_of_payment,
-			reference_no: payment.reference_no || null,
-			reference_date: payment.reference_date || null,
-		});
-		notifySuccess(__("Payment recorded"));
-		payOpen.value = false;
-		await load();
-		emit("changed");
-	} finally {
-		paying.value = false;
-	}
+async function onPaid() {
+	await load();
+	emit("changed");
 }
 
 watch(open, (isOpen) => {
 	if (isOpen && props.name) load();
-});
-watch(payOpen, (isOpen) => {
-	if (!isOpen) return;
-	Object.assign(payment, { amount: null, mode_of_payment: null, reference_no: "", reference_date: "" });
-	payForm.value?.resetValidation();
-	searchModes("");
 });
 </script>

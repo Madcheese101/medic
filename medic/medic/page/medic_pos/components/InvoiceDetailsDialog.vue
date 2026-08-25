@@ -86,15 +86,14 @@
 			</v-card-actions>
 		</v-card>
 
-		<PaymentDialog
+		<SplitPaymentDialog
 			v-model="payOpen"
 			:title="__('Pay')"
-			:grand-total="doc.grand_total"
 			:outstanding="doc.outstanding_amount"
 			:currency="doc.currency"
-			full-only
 			method="pay_appointment_action"
 			:extra-args="{ invoice: doc.name }"
+			require-full
 			@paid="onPaid"
 		/>
 	</v-dialog>
@@ -105,7 +104,7 @@ import { computed, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
 import { call, formatCurrency } from "../client.js";
 import { invoiceStatusColor } from "../constants.js";
-import PaymentDialog from "./PaymentDialog.vue";
+import SplitPaymentDialog from "./SplitPaymentDialog.vue";
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },

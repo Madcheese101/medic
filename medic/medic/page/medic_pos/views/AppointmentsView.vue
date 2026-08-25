@@ -107,10 +107,9 @@
 
 	<NewSessionDialog v-model="sessionOpen" @created="load" />
 
-	<PaymentDialog
+	<SplitPaymentDialog
 		v-model="payOpen"
 		:title="__('Confirm & Pay')"
-		:grand-total="payTarget.grand_total"
 		:outstanding="payTarget.outstanding_amount"
 		:currency="payTarget.currency"
 		method="pay_appointment"
@@ -125,7 +124,7 @@ import { call, notifySuccess, searchLinkOptions } from "../client.js";
 import { APPOINTMENT_STATUS, appointmentStatusColor } from "../constants.js";
 import NewAppointmentForm from "../components/NewAppointmentForm.vue";
 import NewSessionDialog from "../components/NewSessionDialog.vue";
-import PaymentDialog from "../components/PaymentDialog.vue";
+import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 
 const emit = defineEmits(["navigate"]);
 

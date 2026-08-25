@@ -3,21 +3,12 @@
 		<v-card>
 			<v-card-title class="d-flex align-center">
 				<v-icon icon="mdi-medical-bag" class="mr-2" />
-				{{ __("New Action") }}
+				{{ __("New Action") }}<span v-if="actionType" class="ml-1">— {{ actionType }}</span>
 			</v-card-title>
 			<v-divider />
 			<v-card-text>
 				<v-form ref="form">
 					<v-row dense>
-						<v-col cols="12">
-							<v-select
-								v-model="model.action_type"
-								:items="ACTION_TYPES"
-								:label="__('Action Type')"
-								prepend-inner-icon="mdi-clipboard-list-outline"
-								:rules="[required]"
-							/>
-						</v-col>
 						<v-col cols="12" md="6">
 							<v-autocomplete
 								v-model="model.service_type"
@@ -61,12 +52,12 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
 import { call, notifySuccess, searchLinkOptions } from "../client.js";
-import { ACTION_TYPES } from "../constants.js";
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
 	appointment: { type: String, default: null },
 	serviceType: { type: String, default: null },
+	actionType: { type: String, default: null },
 });
 const emit = defineEmits(["update:modelValue", "created"]);
 
@@ -79,7 +70,7 @@ const { mobile } = useDisplay();
 const form = ref(null);
 const saving = ref(false);
 const options = reactive({ service_type: [], service: [] });
-const model = reactive({ action_type: null, service_type: null, service: null });
+const model = reactive({ service_type: null, service: null });
 
 const required = (value) => !!value || __("Required");
 
@@ -116,7 +107,7 @@ async function save() {
 		await call("create_appointment_action", {
 			name: props.appointment,
 			service: model.service,
-			action_type: model.action_type,
+			action_type: props.actionType,
 		});
 		notifySuccess(__("Action created"));
 		open.value = false;
@@ -129,7 +120,6 @@ async function save() {
 // Reset and preload the type list each time the dialog opens.
 watch(open, (isOpen) => {
 	if (!isOpen) return;
-	model.action_type = null;
 	model.service_type = null;
 	model.service = null;
 	options.service = [];

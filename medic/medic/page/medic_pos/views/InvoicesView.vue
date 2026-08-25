@@ -93,26 +93,24 @@
 		</v-data-table>
 	</v-card>
 
-	<PaymentDialog
+	<SplitPaymentDialog
 		v-model="payOpen"
 		:title="__('Add Payment')"
-		:grand-total="payTarget.grand_total"
 		:outstanding="payTarget.outstanding_amount"
 		:currency="payTarget.currency"
-		method="add_payment"
+		method="record_payments"
 		:extra-args="{ invoice: payTarget.name }"
 		@paid="load"
 	/>
 
-	<PaymentDialog
+	<SplitPaymentDialog
 		v-model="payActionOpen"
 		:title="__('Pay')"
-		:grand-total="payActionTarget.grand_total"
 		:outstanding="payActionTarget.outstanding_amount"
 		:currency="payActionTarget.currency"
-		full-only
 		method="pay_appointment_action"
 		:extra-args="{ invoice: payActionTarget.name }"
+		require-full
 		@paid="load"
 	/>
 
@@ -123,7 +121,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { call, formatCurrency, searchLinkOptions } from "../client.js";
 import { SALES_INVOICE_STATUS, invoiceStatusColor } from "../constants.js";
-import PaymentDialog from "../components/PaymentDialog.vue";
+import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import InvoiceDetailsDialog from "../components/InvoiceDetailsDialog.vue";
 
 const rows = ref([]);

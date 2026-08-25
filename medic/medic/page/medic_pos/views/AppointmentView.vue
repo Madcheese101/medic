@@ -10,6 +10,29 @@
 			/>
 			<span class="text-truncate">{{ doc.name || __("Appointment") }}</span>
 			<v-spacer />
+			<v-menu v-if="doc.docstatus === 1 && !isCompleted" location="bottom end">
+				<template #activator="{ props: menuProps }">
+					<v-btn
+						v-bind="menuProps"
+						size="small"
+						variant="tonal"
+						color="primary"
+						prepend-icon="mdi-plus"
+						append-icon="mdi-menu-down"
+						class="mr-3"
+					>
+						{{ __("Add Action") }}
+					</v-btn>
+				</template>
+				<v-list density="comfortable">
+					<v-list-item
+						v-for="t in ACTION_TYPES"
+						:key="t"
+						:title="t"
+						@click="openAction(t)"
+					/>
+				</v-list>
+			</v-menu>
 			<v-chip v-if="isCancelled" color="error" variant="flat" size="large">
 				{{ __("Cancelled") }}
 			</v-chip>
@@ -105,20 +128,7 @@
 			</div>
 
 			<v-divider class="my-5" />
-			<div class="d-flex align-center mb-2">
-				<div class="text-subtitle-2 text-medium-emphasis">{{ __("Actions") }}</div>
-				<v-spacer />
-				<v-btn
-					v-if="doc.docstatus === 1 && !isCompleted"
-					size="small"
-					variant="tonal"
-					color="primary"
-					prepend-icon="mdi-plus"
-					@click="actionOpen = true"
-				>
-					{{ __("Add Action") }}
-				</v-btn>
-			</div>
+			<div class="text-subtitle-2 text-medium-emphasis mb-2">{{ __("Actions") }}</div>
 			<v-table density="comfortable">
 				<thead>
 					<tr>
@@ -162,17 +172,17 @@
 		v-model="actionOpen"
 		:appointment="doc.name"
 		:service-type="doc.service_type"
+		:action-type="selectedActionType"
 		@created="load"
 	/>
-	<PaymentDialog
+	<SplitPaymentDialog
 		v-model="payOpen"
 		:title="__('Confirm & Pay')"
-		:grand-total="payTarget.grand_total"
 		:outstanding="payTarget.outstanding_amount"
 		:currency="payTarget.currency"
-		full-only
 		method="pay_appointment_action"
 		:extra-args="{ invoice: payTarget.invoice }"
+		require-full
 		@paid="load"
 	/>
 </template>
@@ -181,9 +191,9 @@
 import { computed, onMounted, ref } from "vue";
 import { useRtl } from "vuetify";
 import { call, confirmAction, notifySuccess } from "../client.js";
-import { appointmentStatusColor } from "../constants.js";
+import { ACTION_TYPES, appointmentStatusColor } from "../constants.js";
 import AppointmentActionDialog from "../components/AppointmentActionDialog.vue";
-import PaymentDialog from "../components/PaymentDialog.vue";
+import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 
 const props = defineProps({ name: { type: String, default: null } });
 const emit = defineEmits(["back"]);
@@ -195,6 +205,7 @@ const checkingIn = ref(false);
 const completing = ref(false);
 const savingNotes = ref(false);
 const actionOpen = ref(false);
+const selectedActionType = ref(null);
 const payOpen = ref(false);
 const payTarget = ref({});
 const doc = ref({});
@@ -255,6 +266,12 @@ async function checkIn() {
 	} finally {
 		checkingIn.value = false;
 	}
+}
+
+// The dropdown picks the action type; the dialog then only asks for the service.
+function openAction(actionType) {
+	selectedActionType.value = actionType;
+	actionOpen.value = true;
 }
 
 // علاج actions are paid in full; the row carries its invoice totals from get_appointment.

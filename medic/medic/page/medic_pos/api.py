@@ -368,8 +368,10 @@ def confirm_appointment_invoice(name):
 
 
 @frappe.whitelist()
-def pay_appointment(name, amount, mode_of_payment, reference_no=None, reference_date=None):
-	"""Submit the appointment's invoice (if draft) and record a payment; confirm when fully paid."""
+def pay_appointment(name, payments):
+	"""Submit the appointment's invoice (if draft) and record one or more payments; confirm when
+	fully paid. `payments`: list of {mode_of_payment, amount, reference_no?, reference_date?}."""
+	payments = frappe.parse_json(payments) or []
 	pa = frappe.get_doc("Patient Appointment", name)
 	if pa.docstatus != 1:
 		frappe.throw(_("Appointment must be submitted before paying."))
@@ -378,10 +380,14 @@ def pay_appointment(name, amount, mode_of_payment, reference_no=None, reference_
 	si = frappe.get_doc("Sales Invoice", invoice)
 	if si.docstatus == 0:
 		# Submitting unpaid leaves the status غير مؤكد (the events hook returns early);
-		# the payment below reduces the outstanding, and we flip to مؤكد once it clears.
+		# the payments below reduce the outstanding, and we flip to مؤكد once it clears.
 		si.submit()
 
-	add_payment(invoice, amount, mode_of_payment, reference_no, reference_date)
+	for p in payments:
+		add_payment(
+			invoice, p.get("amount"), p.get("mode_of_payment"),
+			p.get("reference_no"), p.get("reference_date"),
+		)
 
 	outstanding = flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))
 	if outstanding <= 0 and pa.appointment_status != "مؤكد":
@@ -436,15 +442,26 @@ def create_appointment_action(name, service, action_type):
 
 
 @frappe.whitelist()
-def pay_appointment_action(invoice, mode_of_payment, reference_no=None, reference_date=None):
-	"""Pay an action invoice IN FULL (submit it if draft), then mark its action row paid."""
+def pay_appointment_action(invoice, payments):
+	"""Pay an action invoice IN FULL (submit it if draft), split across one or more payment
+	methods, then mark its action row paid. `payments` is a list of
+	{mode_of_payment, amount, reference_no?, reference_date?}."""
+	payments = frappe.parse_json(payments) or []
 	si = frappe.get_doc("Sales Invoice", invoice)
 	if si.docstatus == 0:
 		si.submit()
 
 	outstanding = flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))
-	if outstanding > 0:
-		add_payment(invoice, outstanding, mode_of_payment, reference_no, reference_date)
+	total = sum(flt(p.get("amount")) for p in payments)
+	if abs(total - outstanding) > 0.01:
+		frappe.throw(_("Payments must total the full amount ({0}).").format(outstanding))
+
+	# Each method becomes its own Payment Entry allocated to the invoice.
+	for p in payments:
+		add_payment(
+			invoice, p.get("amount"), p.get("mode_of_payment"),
+			p.get("reference_no"), p.get("reference_date"),
+		)
 
 	# We submitted it unpaid, so the events hook's fully-paid branch was skipped; flip it here.
 	row = frappe.db.exists("Appointment Actions", {"invoice": invoice})
@@ -674,6 +691,20 @@ def add_payment(invoice, amount, mode_of_payment, reference_no=None, reference_d
 	pe.submit()
 	_update_appointment_status(invoice)
 	return pe.name
+
+
+@frappe.whitelist()
+def record_payments(invoice, payments):
+	"""Record one or more payments against an already-submitted Sales Invoice (partial allowed).
+	`payments`: list of {mode_of_payment, amount, reference_no?, reference_date?}."""
+	payments = frappe.parse_json(payments) or []
+	for p in payments:
+		add_payment(
+			invoice, p.get("amount"), p.get("mode_of_payment"),
+			p.get("reference_no"), p.get("reference_date"),
+		)
+	return {"invoice": invoice, "outstanding_amount": flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))}
+
 
 def _update_appointment_status(sales_invoice):
 	"""Update the appointment status based on the invoice's payment status."""
