@@ -49,12 +49,19 @@
 					<v-btn v-else size="small" variant="tonal" color="primary" prepend-icon="mdi-cash-plus" @click="payOpen = true">
 						{{ __("Add Payment") }}
 					</v-btn>
+					<DoctorDatePicker
+						v-if="plan.invoice"
+						v-model="sessionDate"
+						:employee="plan.employee"
+						:label="__('Session Date')"
+						style="max-width: 220px"
+					/>
 					<v-btn
 						size="small"
 						variant="flat"
 						color="primary"
 						prepend-icon="mdi-plus"
-						:disabled="!plan.invoice"
+						:disabled="!plan.invoice || !sessionDate"
 						:loading="addingSession"
 						@click="addSession"
 					>
@@ -133,6 +140,7 @@ import { useDisplay } from "vuetify";
 import { call, formatCurrency, notifySuccess } from "../client.js";
 import { appointmentStatusColor, treatmentStatusColor } from "../constants.js";
 import SplitPaymentDialog from "./SplitPaymentDialog.vue";
+import DoctorDatePicker from "./DoctorDatePicker.vue";
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -151,6 +159,7 @@ const addingSession = ref(false);
 const checkingIn = ref(null);
 const creatingInvoice = ref(false);
 const plan = ref({ sessions: [] });
+const sessionDate = ref(null);
 
 const payOpen = ref(false);
 
@@ -172,8 +181,12 @@ async function load() {
 async function addSession() {
 	addingSession.value = true;
 	try {
-		await call("create_session", { treatment_plan: props.name });
+		await call("create_session", {
+			treatment_plan: props.name,
+			appointment_date: sessionDate.value,
+		});
 		notifySuccess(__("Session added"));
+		sessionDate.value = null;
 		await load();
 		emit("changed");
 	} finally {

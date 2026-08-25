@@ -102,15 +102,6 @@
 							/>
 						</v-col>
 						<v-col cols="12" md="6">
-							<v-text-field
-								v-model="appt.appointment_date"
-								type="date"
-								:label="__('Appointment Date')"
-								prepend-inner-icon="mdi-calendar"
-								:rules="[required]"
-							/>
-						</v-col>
-						<v-col cols="12" md="6">
 							<v-autocomplete
 								v-model="appt.employee"
 								:items="options.employee"
@@ -119,6 +110,14 @@
 								item-props
 								:rules="[required]"
 								@update:search="(t) => searchLink('employee', 'Employee', t, {}, 'employee_name')"
+							/>
+						</v-col>
+						<v-col cols="12" md="6">
+							<DoctorDatePicker
+								v-model="appt.appointment_date"
+								:employee="appt.employee"
+								:label="__('Appointment Date')"
+								:rules="[required]"
 							/>
 						</v-col>
 						<v-col cols="12" md="6">
@@ -180,6 +179,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useRtl } from "vuetify";
 import { call, customSearchLink, notifySuccess, searchLinkOptions } from "../client.js";
 import { APPOINTMENT_TYPES, BLOOD_TYPES } from "../constants.js";
+import DoctorDatePicker from "./DoctorDatePicker.vue";
 
 const emit = defineEmits(["created", "cancel"]);
 

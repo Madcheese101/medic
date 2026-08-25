@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.desk.search import build_for_autosuggest, sanitize_searchfield, search_widget
-from frappe.utils import cint, flt, today
+from frappe.utils import cint, flt, getdate, today
 
 PATIENT_FIELDS = ("customer_name", "date_of_birth", "custom_phone_number", "gender", "blood_type")
 
@@ -197,6 +197,76 @@ def save_schedule(rows, employee):
 	return doc.name
 
 
+# ---------------------------------------------------------------- availability
+
+# JS Date.getDay() convention: Sunday=0 .. Saturday=6.
+DAY_INDEX = {
+	"Sunday": 0,
+	"Monday": 1,
+	"Tuesday": 2,
+	"Wednesday": 3,
+	"Thursday": 4,
+	"Friday": 5,
+	"Saturday": 6,
+}
+
+
+@frappe.whitelist()
+def get_doctor_availability(employee):
+	"""Active weekday capacities + future booked counts to drive the date picker."""
+	weekday_max = {}
+	name = frappe.db.exists("Doctor Schedule", {"employee": employee})
+	if name:
+		doc = frappe.get_doc("Doctor Schedule", name)
+		for row in doc.schedule:
+			idx = DAY_INDEX.get(row.day)
+			if row.is_active and idx is not None:
+				weekday_max[idx] = cint(row.maximum_appointments)
+
+	booked = {}
+	rows = frappe.get_all(
+		"Patient Appointment",
+		filters={
+			"employee": employee,
+			"appointment_date": [">=", today()],
+			"docstatus": ["<", 2],
+		},
+		fields=["appointment_date", "count(name) as n"],
+		group_by="appointment_date",
+	)
+	for r in rows:
+		booked[str(r.appointment_date)] = r.n
+
+	return {"weekday_max": weekday_max, "booked": booked, "today": today()}
+
+
+def _validate_appointment_date(employee, appointment_date, ignore=None):
+	"""Enforce no-backdate + doctor's active weekday + daily capacity."""
+	if getdate(appointment_date) < getdate(today()):
+		frappe.throw(_("Cannot book an appointment in the past."))
+
+	name = frappe.db.exists("Doctor Schedule", {"employee": employee})
+	if not name:
+		frappe.throw(_("This doctor has no availability schedule."))
+
+	doc = frappe.get_doc("Doctor Schedule", name)
+	day_name = getdate(appointment_date).strftime("%A")
+	row = next((r for r in doc.schedule if r.day == day_name and r.is_active), None)
+	if not row:
+		frappe.throw(_("The doctor is not available on {0}.").format(day_name))
+
+	filters = {
+		"employee": employee,
+		"appointment_date": appointment_date,
+		"docstatus": ["<", 2],
+	}
+	if ignore:
+		filters["name"] = ["!=", ignore]
+	cap = cint(row.maximum_appointments)  # 0 = unlimited
+	if cap and frappe.db.count("Patient Appointment", filters) >= cap:
+		frappe.throw(_("The doctor is fully booked on {0}.").format(appointment_date))
+
+
 # ---------------------------------------------------------------- profile
 
 
@@ -272,6 +342,7 @@ def get_appointments(
 def create_appointment(
 	appointment_type, customer, employee, appointment_date, service_type, service, notes=None
 ):
+	_validate_appointment_date(employee, appointment_date)
 	doc = frappe.new_doc("Patient Appointment")
 	doc.update(
 		{
@@ -787,10 +858,13 @@ def _update_appointment_status(sales_invoice):
 		pa.db_set("appointment_status", "مؤكد")
 
 @frappe.whitelist()
-def create_session(treatment_plan):
+def create_session(treatment_plan, appointment_date=None):
 	plan = frappe.get_doc("Treatment Plan", treatment_plan)
 	if not plan.invoice:
 		frappe.throw(_("Create the plan invoice before adding sessions."))
+
+	appointment_date = appointment_date or today()
+	_validate_appointment_date(plan.employee, appointment_date)
 
 	session_no = frappe.db.count("Patient Appointment", {"treatment_plan": treatment_plan}) + 1
 	if session_no > cint(plan.total_sessions):
@@ -808,7 +882,7 @@ def create_session(treatment_plan):
 			"appointment_type": "علاج",
 			"customer": plan.customer,
 			"employee": plan.employee,
-			"appointment_date": today(),
+			"appointment_date": appointment_date,
 			"service_type": frappe.db.get_value("Item", plan.service, "item_group"),
 			"service": plan.service,
 			"treatment_plan": plan.name,
