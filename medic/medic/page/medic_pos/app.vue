@@ -10,14 +10,32 @@
 		>
 			<v-list nav density="comfortable">
 				<v-list-subheader v-if="!rail || mobile">{{ __("Application") }}</v-list-subheader>
-				<v-list-item
-					v-for="item in navItems"
-					:key="item.value"
-					:active="activeView === item.value"
-					:prepend-icon="item.icon"
-					:title="__(item.title)"
-					@click="selectView(item.value)"
-				/>
+				<template v-for="item in navItems" :key="item.value">
+					<v-list-group v-if="item.children" :value="item.value">
+						<template #activator="{ props }">
+							<v-list-item
+								v-bind="props"
+								:prepend-icon="item.icon"
+								:title="__(item.title)"
+							/>
+						</template>
+						<v-list-item
+							v-for="child in item.children"
+							:key="child.value"
+							:active="activeView === child.value"
+							:prepend-icon="child.icon"
+							:title="__(child.title)"
+							@click="selectView(child.value)"
+						/>
+					</v-list-group>
+					<v-list-item
+						v-else
+						:active="activeView === item.value"
+						:prepend-icon="item.icon"
+						:title="__(item.title)"
+						@click="selectView(item.value)"
+					/>
+				</template>
 			</v-list>
 
 			<template #append>
@@ -103,12 +121,27 @@ const fullName = computed(() => frappe.session.user_fullname || frappe.session.u
 const profileImage = ref(frappe.boot.user_info?.[frappe.session.user]?.image || null);
 const initials = computed(() => (fullName.value || "?").trim().charAt(0).toUpperCase());
 
-const navItems = [
-	{ value: "patients", title: "Patients", icon: "mdi-account-injury-outline" },
-	{ value: "appointments", title: "Appointments", icon: "mdi-calendar-check-outline" },
-	{ value: "treatments", title: "Treatments", icon: "mdi-clipboard-pulse-outline" },
-	{ value: "invoices", title: "Invoices", icon: "mdi-receipt-text-outline" },
-];
+const navItems = computed(() => {
+	const items = [
+		{ value: "patients", title: "Patients", icon: "mdi-account-injury-outline" },
+		{ value: "appointments", title: "Appointments", icon: "mdi-calendar-check-outline" },
+		{ value: "treatments", title: "Treatments", icon: "mdi-clipboard-pulse-outline" },
+		{ value: "invoices", title: "Invoices", icon: "mdi-receipt-text-outline" },
+	];
+	// Pharmacy section only when the clinic has pharmacy configured.
+	if (frappe.boot.pharmacy_item_group) {
+		items.push({
+			value: "pharmacy",
+			title: "Pharmacy",
+			icon: "mdi-medical-bag",
+			children: [
+				{ value: "pharmacy-prescriptions", title: "Prescription", icon: "mdi-prescription" },
+				{ value: "pharmacy-pos", title: "POS", icon: "mdi-cash-register" },
+			],
+		});
+	}
+	return items;
+});
 
 const router = useRouter();
 const route = useRoute();

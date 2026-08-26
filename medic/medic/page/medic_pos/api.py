@@ -1070,3 +1070,221 @@ def get_sales_invoice(name):
 		)
 	data["payments"] = payments
 	return data
+
+
+# ---------------------------------------------------------------- pharmacy / POS
+
+# Each context maps to a Clinic Setup POS Profile + Item Group, so the same POS
+# view and endpoints serve Pharmacy now and Test Lab later.
+POS_CONTEXTS = {
+	"pharmacy": {"profile_field": "pharmacy_pos_profile", "group_field": "pharmacy_item_group"},
+	"test_lab": {"profile_field": "test_lab_pos_profile", "group_field": "test_lab_item_group"},
+}
+
+
+def _pos_config(context):
+	cfg = POS_CONTEXTS.get(context)
+	if not cfg:
+		frappe.throw(_("Unknown POS context: {0}").format(context))
+
+	cs = frappe.get_single("Clinic Setup")
+	profile = cs.get(cfg["profile_field"])
+	if not profile:
+		frappe.throw(_("No POS Profile is configured for {0} in Clinic Setup.").format(context))
+
+	return {"pos_profile": profile, "item_group": cs.get(cfg["group_field"])}
+
+
+def _item_uoms(item_code, stock_uom):
+	uoms = frappe.get_all(
+		"UOM Conversion Detail",
+		filters={"parent": item_code},
+		fields=["uom", "conversion_factor"],
+	)
+	if not any(u["uom"] == stock_uom for u in uoms):
+		uoms.insert(0, {"uom": stock_uom, "conversion_factor": 1})
+	return uoms
+
+
+def _pos_item_line(profile, item_code, qty=1):
+	"""One POS cart line: price at stock UOM + available qty + the item's UOMs."""
+	from erpnext.stock.get_item_details import get_bin_details, get_price_list_rate_for
+
+	item = frappe.db.get_value("Item", item_code, ["item_name", "stock_uom"], as_dict=True)
+	stock_uom = item.stock_uom
+	rate = get_price_list_rate_for(
+		frappe._dict(
+			price_list=profile.selling_price_list,
+			uom=stock_uom,
+			qty=qty,
+			transaction_date=today(),
+			conversion_factor=1,
+		),
+		item_code,
+	)
+	bin_details = get_bin_details(item_code, profile.warehouse)
+	return {
+		"item_code": item_code,
+		"item_name": item.item_name,
+		"stock_uom": stock_uom,
+		"uom": stock_uom,
+		"qty": qty,
+		"conversion_factor": 1,
+		"price_list_rate": flt(rate),
+		"rate": flt(rate),
+		"actual_qty": flt(bin_details.get("actual_qty")),
+		"uoms": _item_uoms(item_code, stock_uom),
+	}
+
+
+@frappe.whitelist()
+def get_pos_context(context):
+	cfg = _pos_config(context)
+	p = frappe.get_doc("POS Profile", cfg["pos_profile"])
+	# type lets the pay dialog know which modes need a reference (bank/cheque).
+	mode_types = dict(
+		frappe.get_all("Mode of Payment", fields=["name", "type"], as_list=True)
+	)
+	return {
+		"pos_profile": p.name,
+		"item_group": cfg["item_group"],
+		"customer": p.customer,
+		"price_list": p.selling_price_list,
+		"warehouse": p.warehouse,
+		"company": p.company,
+		"currency": p.currency,
+		"print_format": p.print_format,
+		"payment_modes": [
+			{
+				"mode_of_payment": row.mode_of_payment,
+				"default": row.default,
+				"type": mode_types.get(row.mode_of_payment),
+			}
+			for row in p.payments
+		],
+	}
+
+
+@frappe.whitelist()
+def pos_search_items(context, txt=""):
+	cfg = _pos_config(context)
+	profile = frappe.get_doc("POS Profile", cfg["pos_profile"])
+	filters = {"disabled": 0, "is_sales_item": 1}
+	if cfg["item_group"]:
+		filters["item_group"] = cfg["item_group"]
+
+	or_filters = None
+	if txt:
+		or_filters = {"item_code": ["like", f"%{txt}%"], "item_name": ["like", f"%{txt}%"]}
+
+	items = frappe.get_all(
+		"Item", filters=filters, or_filters=or_filters, pluck="name", limit=40, order_by="item_name asc"
+	)
+	return [_pos_item_line(profile, code) for code in items]
+
+
+@frappe.whitelist()
+def pos_item_price(context, item_code, uom):
+	from erpnext.stock.get_item_details import get_conversion_factor, get_price_list_rate_for
+
+	cfg = _pos_config(context)
+	profile = frappe.get_doc("POS Profile", cfg["pos_profile"])
+	conversion_factor = flt(get_conversion_factor(item_code, uom).get("conversion_factor")) or 1
+	rate = get_price_list_rate_for(
+		frappe._dict(
+			price_list=profile.selling_price_list,
+			uom=uom,
+			qty=1,
+			transaction_date=today(),
+			conversion_factor=conversion_factor,
+		),
+		item_code,
+	)
+	return {"price_list_rate": flt(rate), "conversion_factor": conversion_factor}
+
+
+@frappe.whitelist()
+def get_prescription_cart(context, prescription):
+	cfg = _pos_config(context)
+	profile = frappe.get_doc("POS Profile", cfg["pos_profile"])
+	pr = frappe.get_doc("Prescription", prescription)
+	return {
+		"customer": pr.patient,
+		"items": [_pos_item_line(profile, row.item) for row in pr.items],
+	}
+
+
+@frappe.whitelist()
+def create_pos_invoice(context, customer, items, payments, prescription=None):
+	cfg = _pos_config(context)
+	profile = frappe.get_doc("POS Profile", cfg["pos_profile"])
+	items = frappe.parse_json(items) or []
+	payments = frappe.parse_json(payments) or []
+	if not items:
+		frappe.throw(_("Add at least one item before checkout."))
+
+	si = frappe.new_doc("Sales Invoice")
+	si.customer = customer
+	si.company = profile.company
+	si.pos_profile = profile.name
+	si.is_pos = 1
+	si.update_stock = 1
+	si.selling_price_list = profile.selling_price_list
+	si.set_warehouse = profile.warehouse
+	for it in items:
+		si.append(
+			"items",
+			{
+				"item_code": it["item_code"],
+				"qty": flt(it["qty"]),
+				"uom": it.get("uom"),
+				"conversion_factor": flt(it.get("conversion_factor")) or 1,
+				"rate": flt(it["rate"]),
+				"warehouse": profile.warehouse,
+			},
+		)
+	for p in payments:
+		si.append("payments", {"mode_of_payment": p["mode_of_payment"], "amount": flt(p["amount"])})
+	si.insert()
+
+	# Prescription invoices are always paid in full.
+	if prescription and abs(sum(flt(p["amount"]) for p in payments) - flt(si.grand_total)) > 0.005:
+		frappe.throw(_("A prescription invoice must be paid in full."))
+
+	si.submit()
+
+	if prescription:
+		pr = frappe.get_doc("Prescription", prescription)
+		pr.db_set("invoice_created", 1)
+		pr.db_set("sales_invoice", si.name)
+
+	return {"name": si.name, "grand_total": flt(si.grand_total)}
+
+
+@frappe.whitelist()
+def list_prescriptions(customer=None, mobile=None, include_invoiced=0):
+	filters = {}
+	if customer:
+		filters["patient"] = customer
+	if not cint(include_invoiced):
+		filters["invoice_created"] = 0
+	if mobile:
+		matches = frappe.get_all(
+			"Customer", filters={"custom_phone_number": ["like", f"%{mobile}%"]}, pluck="name"
+		)
+		filters["patient"] = ["in", matches or [""]]
+
+	return frappe.qb.get_query(
+		"Prescription",
+		fields=[
+			"name",
+			"patient",
+			"patient.customer_name as customer_name",
+			"patient.custom_phone_number as mobile",
+			"posting_date",
+			"invoice_created",
+			"sales_invoice",
+		],
+		filters=filters,
+		order_by="creation desc",
+	).run(as_dict=True)

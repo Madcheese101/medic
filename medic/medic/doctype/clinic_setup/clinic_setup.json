@@ -6,12 +6,17 @@
  "engine": "InnoDB",
  "field_order": [
   "service_parent_item_group",
+  "column_break_ibqz",
+  "doctors_default_designation",
+  "section_break_qjdk",
   "enable_pharmacy",
   "pharmacy_item_group",
+  "pharmacy_pos_profile",
+  "prescription_print_format",
+  "column_break_zmkf",
   "enable_test_lab",
   "test_lab_item_group",
-  "column_break_ibqz",
-  "doctors_default_designation"
+  "test_lab_pos_profile"
  ],
  "fields": [
   {
@@ -62,13 +67,45 @@
    "mandatory_depends_on": "eval:doc.enable_pharmacy",
    "options": "Item Group",
    "read_only_depends_on": "eval:!doc.enable_pharmacy"
+  },
+  {
+   "fieldname": "pharmacy_pos_profile",
+   "fieldtype": "Link",
+   "label": "Pharmacy POS Profile",
+   "mandatory_depends_on": "eval:doc.enable_pharmacy",
+   "options": "POS Profile",
+   "read_only_depends_on": "eval:!doc.enable_pharmacy"
+  },
+  {
+   "fieldname": "test_lab_pos_profile",
+   "fieldtype": "Link",
+   "label": "Test Lab POS Profile",
+   "mandatory_depends_on": "eval:doc.enable_test_lab",
+   "options": "POS Profile",
+   "read_only_depends_on": "eval:!doc.enable_test_lab"
+  },
+  {
+   "fieldname": "section_break_qjdk",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "prescription_print_format",
+   "fieldtype": "Link",
+   "label": "Prescription Print Format",
+   "mandatory_depends_on": "eval:doc.enable_pharmacy",
+   "options": "Print Format",
+   "read_only_depends_on": "eval:!doc.enable_pharmacy"
+  },
+  {
+   "fieldname": "column_break_zmkf",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-24 15:42:00.592474",
+ "modified": "2026-08-26 12:44:39.257047",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Clinic Setup",
@@ -83,6 +120,14 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "All",
+   "select": 1,
+   "share": 1
   }
  ],
  "row_format": "Dynamic",

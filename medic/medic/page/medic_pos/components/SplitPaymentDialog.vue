@@ -103,6 +103,8 @@ const props = defineProps({
 	extraArgs: { type: Object, default: () => ({}) },
 	// Actions must be paid in full; other invoices allow a partial total.
 	requireFull: { type: Boolean, default: false },
+	// Restrict the mode list (e.g. a POS Profile's modes). null → fetch all enabled modes.
+	modes: { type: Array, default: null },
 });
 const emit = defineEmits(["update:modelValue", "paid"]);
 
@@ -156,7 +158,7 @@ async function submit() {
 
 	paying.value = true;
 	try {
-		await call(props.method, {
+		const result = await call(props.method, {
 			...props.extraArgs,
 			payments: rows.value.map((r) => ({
 				mode_of_payment: r.mode_of_payment,
@@ -167,7 +169,7 @@ async function submit() {
 		});
 		notifySuccess(__("Payment recorded"));
 		open.value = false;
-		emit("paid");
+		emit("paid", result);
 	} finally {
 		paying.value = false;
 	}
@@ -178,6 +180,7 @@ watch(open, (isOpen) => {
 	if (!isOpen) return;
 	rows.value = [blankRow(props.outstanding || null)];
 	form.value?.resetValidation();
-	if (!modes.value.length) loadModes();
+	if (props.modes) modes.value = props.modes;
+	else if (!modes.value.length) loadModes();
 });
 </script>

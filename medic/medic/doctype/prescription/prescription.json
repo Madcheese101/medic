@@ -9,7 +9,8 @@
   "patient",
   "appointment",
   "items",
-  "invoice_created"
+  "invoice_created",
+  "sales_invoice"
  ],
  "fields": [
   {
@@ -45,6 +46,13 @@
    "fieldname": "invoice_created",
    "fieldtype": "Check",
    "label": "Invoice Created"
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
