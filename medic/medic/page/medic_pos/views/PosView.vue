@@ -9,7 +9,7 @@
 		<!-- Left: customer + cart + totals -->
 		<v-col cols="12" md="7">
 			<v-card>
-				<v-card-text>
+				<v-card-text class="d-flex flex-column" style="max-height: calc(100vh - 220px)">
 					<div class="d-flex align-center ga-2 mb-3">
 						<v-spacer />
 						<v-btn
@@ -44,8 +44,9 @@
 						@update:search="searchCustomers"
 					/>
 
-					<v-table density="comfortable">
-						<thead>
+					<div class="flex-grow-1 overflow-y-auto" style="min-height: 0">
+						<v-table density="comfortable">
+							<thead>
 							<tr>
 								<th>{{ __("Item") }}</th>
 								<th style="width: 130px">{{ __("UOM") }}</th>
@@ -99,7 +100,8 @@
 								</td>
 							</tr>
 						</tbody>
-					</v-table>
+						</v-table>
+					</div>
 
 					<v-divider class="my-3" />
 					<div class="d-flex justify-space-between text-body-2">
