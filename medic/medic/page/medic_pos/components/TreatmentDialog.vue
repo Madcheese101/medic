@@ -3,7 +3,7 @@
 		<v-card :loading="loading">
 			<v-card-title class="d-flex align-center">
 				<v-icon icon="mdi-clipboard-pulse-outline" class="mr-2" />
-				<span class="text-truncate">{{ plan.service || __("Treatment Plan") }}</span>
+				<span class="text-truncate">{{ plan.service_name || plan.service || __("Treatment Plan") }}</span>
 				<v-spacer />
 				<v-chip :color="treatmentStatusColor(plan.status)" variant="tonal" size="small">
 					{{ plan.status }}

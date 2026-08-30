@@ -373,6 +373,7 @@ def get_appointment(name):
 	doc = frappe.get_doc("Patient Appointment", name)
 	data = doc.as_dict()
 	data["doctor_name"] = frappe.db.get_value("Employee", doc.employee, "employee_name")
+	data["service_name"] = frappe.db.get_value("Item", doc.service, "item_name")
 	# Each action row carries its own invoice's totals so the table/pay dialog have amounts.
 	currency = _company_currency()
 	for row in data.get("actions") or []:
@@ -650,7 +651,7 @@ def _invoice_financials(invoice):
 TREATMENT_PLAN_JOIN_FIELDS = (
 	"name", "status", "customer", "customer.customer_name as customer_name",
 	"employee", "employee.employee_name as doctor_name",
-	"service", "total_sessions", "completed_sessions", "invoice",
+	"service", "service.item_name as service_name", "total_sessions", "completed_sessions", "invoice",
 	"invoice.grand_total as grand_total", "invoice.outstanding_amount as outstanding_amount",
 )
 
@@ -728,6 +729,7 @@ def create_treatment_plan_invoice(name):
 
 def _plan_dict(plan):
 	data = plan.as_dict() if hasattr(plan, "as_dict") else dict(plan)
+	data["service_name"] = frappe.db.get_value("Item", data.get("service"), "item_name")
 	data.update(_invoice_financials(data.get("invoice")))
 	company = _company()
 	data["currency"] = frappe.db.get_value("Company", company, "default_currency") if company else None

@@ -48,6 +48,7 @@
 			<template #item.status="{ item }">
 				<v-chip size="small" variant="tonal" :color="treatmentStatusColor(item.status)">{{ item.status }}</v-chip>
 			</template>
+			<template #item.service="{ item }">{{ item.service_name || item.service }}</template>
 			<template #item.sessions="{ item }">{{ item.completed_sessions || 0 }} / {{ item.total_sessions }}</template>
 			<template #item.paid="{ item }">{{ Math.round((item.paid_pct || 0) * 100) }}%</template>
 			<template #item.actions="{ item }">

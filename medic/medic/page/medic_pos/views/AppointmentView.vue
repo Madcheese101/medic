@@ -61,7 +61,7 @@
 					<v-text-field :model-value="doc.service_type" :label="__('Service Type')" prepend-inner-icon="mdi-shape-outline" readonly />
 				</v-col>
 				<v-col cols="12" md="6">
-					<v-text-field :model-value="doc.service" :label="__('Service')" prepend-inner-icon="mdi-medical-bag" readonly />
+					<v-text-field :model-value="doc.service_name || doc.service" :label="__('Service')" prepend-inner-icon="mdi-medical-bag" readonly />
 				</v-col>
 				<v-col cols="12" md="6">
 					<v-text-field :model-value="doc.invoice" :label="__('Invoice')" prepend-inner-icon="mdi-receipt-text-outline" readonly />

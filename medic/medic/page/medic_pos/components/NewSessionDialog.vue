@@ -93,7 +93,7 @@ async function loadPlans() {
 	try {
 		const plans = await call("get_active_treatment_plans", { customer: customer.value });
 		planItems.value = plans.map((p) => ({
-			title: `${p.name} · ${p.service} (${p.completed_sessions || 0}/${p.total_sessions})`,
+			title: `${p.name} · ${p.service_name || p.service} (${p.completed_sessions || 0}/${p.total_sessions})`,
 			value: p.name,
 			employee: p.employee,
 		}));
