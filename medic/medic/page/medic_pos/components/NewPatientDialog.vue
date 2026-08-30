@@ -31,7 +31,7 @@
 								v-model="model.custom_phone_number"
 								:label="__('Mobile No')"
 								prepend-inner-icon="mdi-phone-outline"
-								:hint="__('Include the country code, e.g. +218…')"
+								:hint="__('e.g. 0912345678')"
 								:rules="[required]"
 							/>
 						</v-col>

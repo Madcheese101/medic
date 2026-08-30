@@ -17,6 +17,27 @@ def create_doctor_schedule(doctor):
 		schedule.fill_table()
 		schedule.save()
 
+def on_customer_before_validate(doc, method=None):
+	"""Store locally-typed phone numbers in E.164 so the Phone field validation accepts them."""
+	import phonenumbers
+
+	number = (doc.custom_phone_number or "").strip()
+	if not number:
+		return
+
+	country = frappe.db.get_single_value("Global Defaults", "country")
+	region = frappe.db.get_value("Country", country, "code") if country else None
+	if not region:
+		return
+
+	try:
+		parsed = phonenumbers.parse(number, region.upper())
+	except phonenumbers.NumberParseException:
+		# Not a phone number at all; let the built-in validation reject what was typed.
+		return
+
+	doc.custom_phone_number = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+
 def on_customer_create(doc, method=None):
 	if not frappe.db.exists("Medical History", {"customer": doc.name}):
 		patient = frappe.new_doc("Medical History")

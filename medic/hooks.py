@@ -149,6 +149,7 @@ doc_events = {
 		"after_insert": "medic.events.on_employee_create"
 	},
 	"Customer": {
+		"before_validate": "medic.events.on_customer_before_validate",
 		"after_insert": "medic.events.on_customer_create"
 	},
 	"Sales Invoice": {

@@ -6,6 +6,11 @@ from frappe.utils import cint, flt, getdate, today
 PATIENT_FIELDS = ("customer_name", "date_of_birth", "custom_phone_number", "gender", "blood_type")
 
 
+def _phone_like(mobile):
+	"""Numbers are stored in E.164 (+218…), so drop the leading 0 of a locally-typed one."""
+	return ["like", f"%{mobile.strip().lstrip('0')}%"]
+
+
 def _company():
 	return frappe.defaults.get_user_default("Company") or frappe.db.get_single_value(
 		"Global Defaults", "default_company"
@@ -52,7 +57,7 @@ def get_patients(customer_name=None, mobile=None, file_no=None, limit=100):
 	if customer_name:
 		filters["customer_name"] = ["like", f"%{customer_name}%"]
 	if mobile:
-		filters["custom_phone_number"] = ["like", f"%{mobile}%"]
+		filters["custom_phone_number"] = _phone_like(mobile)
 	if file_no:
 		filters["name"] = ["like", f"%{file_no}%"]
 
@@ -1270,7 +1275,7 @@ def list_prescriptions(customer=None, mobile=None, include_invoiced=0):
 		filters["invoice_created"] = 0
 	if mobile:
 		matches = frappe.get_all(
-			"Customer", filters={"custom_phone_number": ["like", f"%{mobile}%"]}, pluck="name"
+			"Customer", filters={"custom_phone_number": _phone_like(mobile)}, pluck="name"
 		)
 		filters["patient"] = ["in", matches or [""]]
 
