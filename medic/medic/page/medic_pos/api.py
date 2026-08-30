@@ -77,7 +77,7 @@ def create_patient(customer_name, date_of_birth, custom_phone_number, gender, bl
 		{
 			"customer_group": "Individual",
 			"customer_name": customer_name,
-			"date_of_birth": date_of_birth,
+			"date_of_birth": date_of_birth or None,
 			"custom_phone_number": custom_phone_number,
 			"gender": gender,
 			"blood_type": blood_type,
@@ -130,7 +130,7 @@ def save_patient(name, customer_name, date_of_birth, custom_phone_number, gender
 	doc.update(
 		{
 			"customer_name": customer_name,
-			"date_of_birth": date_of_birth,
+			"date_of_birth": date_of_birth or None,
 			"custom_phone_number": custom_phone_number,
 			"gender": gender,
 			"blood_type": blood_type,

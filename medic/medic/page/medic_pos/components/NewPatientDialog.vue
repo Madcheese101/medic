@@ -23,7 +23,6 @@
 								type="date"
 								:label="__('Date of Birth')"
 								prepend-inner-icon="mdi-calendar"
-								:rules="[required]"
 							/>
 						</v-col>
 						<v-col cols="12" md="6">
