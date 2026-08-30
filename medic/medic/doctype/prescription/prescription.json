@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2026-08-23 15:17:15.567969",
+ "creation": "2026-08-26 02:17:53.271654",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -49,16 +49,15 @@
   },
   {
    "fieldname": "sales_invoice",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "label": "Sales Invoice",
-   "options": "Sales Invoice",
    "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-25 21:21:45.013595",
+ "modified": "2026-08-30 14:33:57.843030",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Prescription",
@@ -73,6 +72,30 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Pharmacist",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Doctor",
+   "select": 1,
    "share": 1,
    "write": 1
   }

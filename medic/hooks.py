@@ -270,5 +270,29 @@ fixtures = [
 		"filters": [
 			["module", "=", "Medic"]
 		]
+	},
+	{
+		"doctype": "Designation",
+		"filters": [
+			["name", "in", [
+				"Doctor",
+				"Pharmacist",
+				"Lab Technician",
+				"Receptionist",
+				"Cashier",
+			]]
+		]
+	},
+	{
+		"doctype": "Role",
+		"filters": [
+			["name", "in", [
+				"Doctor",
+				"Pharmacist",
+				"Lab Technician",
+				"Receptionist",
+				"Cashier",
+			]]
+		]
 	}
 ]

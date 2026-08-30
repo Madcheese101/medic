@@ -1,0 +1,52 @@
+[
+ {
+  "appraisal_template": null,
+  "description": null,
+  "designation_name": "Receptionist",
+  "docstatus": 0,
+  "doctype": "Designation",
+  "modified": "2026-08-30 14:23:06.057347",
+  "name": "Receptionist",
+  "skills": []
+ },
+ {
+  "appraisal_template": null,
+  "description": null,
+  "designation_name": "Lab Technician",
+  "docstatus": 0,
+  "doctype": "Designation",
+  "modified": "2026-08-30 14:26:49.482714",
+  "name": "Lab Technician",
+  "skills": []
+ },
+ {
+  "appraisal_template": null,
+  "description": null,
+  "designation_name": "Pharmacist",
+  "docstatus": 0,
+  "doctype": "Designation",
+  "modified": "2026-08-30 14:27:08.524906",
+  "name": "Pharmacist",
+  "skills": []
+ },
+ {
+  "appraisal_template": null,
+  "description": null,
+  "designation_name": "Cashier",
+  "docstatus": 0,
+  "doctype": "Designation",
+  "modified": "2026-08-30 14:28:50.963443",
+  "name": "Cashier",
+  "skills": []
+ },
+ {
+  "appraisal_template": null,
+  "description": null,
+  "designation_name": "Doctor",
+  "docstatus": 0,
+  "doctype": "Designation",
+  "modified": "2025-11-19 12:33:56.889509",
+  "name": "Doctor",
+  "skills": []
+ }
+]

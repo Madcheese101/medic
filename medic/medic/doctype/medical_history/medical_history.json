@@ -42,7 +42,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-18 15:19:11.374163",
+ "modified": "2026-08-30 14:38:38.093166",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Medical History",
@@ -58,6 +58,18 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Doctor",
+   "select": 1,
    "share": 1,
    "write": 1
   }
