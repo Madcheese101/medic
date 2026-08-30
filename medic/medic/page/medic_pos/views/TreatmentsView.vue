@@ -112,7 +112,10 @@ async function searchCustomers(txt) {
 }
 
 async function searchEmployees(txt) {
-	employeeOptions.value = await searchLinkOptions("Employee", txt, {}, "employee_name");
+	const filters = frappe.boot.default_doctor_designation
+		? { designation: frappe.boot.default_doctor_designation }
+		: {};
+	employeeOptions.value = await searchLinkOptions("Employee", txt, filters, "employee_name");
 }
 
 async function load() {

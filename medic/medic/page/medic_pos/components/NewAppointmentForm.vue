@@ -109,7 +109,7 @@
 								prepend-inner-icon="mdi-doctor"
 								item-props
 								:rules="[required]"
-								@update:search="(t) => searchLink('employee', 'Employee', t, {}, 'employee_name')"
+								@update:search="(t) => searchLink('employee', 'Employee', t, doctorFilters, 'employee_name')"
 							/>
 						</v-col>
 						<v-col cols="12" md="6">
@@ -224,6 +224,11 @@ const serviceTypeFilters = computed(() => {
 	return filters;
 });
 
+// The Doctor picker is always restricted to employees with the clinic's doctor designation.
+const doctorFilters = frappe.boot.default_doctor_designation
+	? { designation: frappe.boot.default_doctor_designation }
+	: {};
+
 function required(value) {
 	return !!value || __("Required");
 }
@@ -274,7 +279,7 @@ async function save() {
 // Preload the link lists when the form opens.
 onMounted(() => {
 	searchLink("customer", "Customer", "", {}, "customer_name");
-	searchLink("employee", "Employee", "", {}, "employee_name");
+	searchLink("employee", "Employee", "", doctorFilters, "employee_name");
 	searchLink("service_type", "Item Group", "", serviceTypeFilters.value, "name");
 	searchGenders("");
 });
