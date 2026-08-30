@@ -107,11 +107,14 @@ const required = (v) => !!v || __("Required");
 const positive = (v) => v > 0 || __("Must be at least 1");
 
 async function searchLink(target, doctype, txt, labelFieldname = null) {
+	let filters = {};
 	// The Doctor picker is always restricted to the clinic's doctor designation.
-	const filters =
-		target === "doctors" && frappe.boot.default_doctor_designation
-			? { designation: frappe.boot.default_doctor_designation }
-			: {};
+	if (target === "doctors" && frappe.boot.default_doctor_designation) {
+		filters = { designation: frappe.boot.default_doctor_designation };
+	} else if (target === "services" && frappe.boot.service_item_groups?.length) {
+		// The Service picker is always restricted to the clinic's service item groups.
+		filters = { item_group: ["in", frappe.boot.service_item_groups] };
+	}
 	const list = await searchLinkOptions(doctype, txt, filters, labelFieldname);
 	if (target === "doctors") doctors.value = list;
 	else if (target === "patients") patients.value = list;
