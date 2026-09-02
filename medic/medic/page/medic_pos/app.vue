@@ -129,6 +129,10 @@
 				</router-view>
 			</v-container>
 		</v-main>
+
+		<!-- Reference detail dialogs, opened from any view's reference fields. -->
+		<TreatmentDialog v-model="treatmentDialogOpen" :name="uiStore.treatmentDetail.name" />
+		<InvoiceDetailsDialog v-model="invoiceDialogOpen" :name="uiStore.invoiceDetail.name" />
 	</v-app>
 </template>
 
@@ -138,9 +142,21 @@ import { useRoute, useRouter } from "vue-router";
 import { useDisplay } from "vuetify";
 import { useDefaultsStore } from "./stores/defaults.js";
 import { useUiStore } from "./stores/ui.js";
+import TreatmentDialog from "./components/TreatmentDialog.vue";
+import InvoiceDetailsDialog from "./components/InvoiceDetailsDialog.vue";
 
 const defaultsStore = useDefaultsStore();
 const uiStore = useUiStore();
+
+// v-model bridges to the store so any view can open these detail dialogs.
+const treatmentDialogOpen = computed({
+	get: () => uiStore.treatmentDetail.open,
+	set: (v) => (uiStore.treatmentDetail.open = v),
+});
+const invoiceDialogOpen = computed({
+	get: () => uiStore.invoiceDetail.open,
+	set: (v) => (uiStore.invoiceDetail.open = v),
+});
 const { mobile } = useDisplay();
 const drawer = ref(true);
 const rail = ref(false);
@@ -237,6 +253,15 @@ onBeforeUnmount(() => {
 .medic-pos .v-table,
 .medic-pos .v-data-table {
 	font-variant-numeric: tabular-nums;
+}
+
+/* Clickable reference values in tables. */
+.medic-ref-link {
+	color: rgb(var(--v-theme-primary));
+	cursor: pointer;
+}
+.medic-ref-link:hover {
+	text-decoration: underline;
 }
 
 /* Frappe's native modals (frappe.confirm / msgprint) are Bootstrap dialogs that

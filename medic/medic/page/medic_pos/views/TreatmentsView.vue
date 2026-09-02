@@ -49,6 +49,10 @@
 				<v-chip size="small" variant="tonal" :color="treatmentStatusColor(item.status)">{{ item.status }}</v-chip>
 			</template>
 			<template #item.service="{ item }">{{ item.service_name || item.service }}</template>
+			<template #item.invoice="{ item }">
+				<a v-if="item.invoice" class="medic-ref-link" @click="refs.openInvoice(item.invoice)">{{ item.invoice }}</a>
+				<span v-else class="text-medium-emphasis">—</span>
+			</template>
 			<template #item.sessions="{ item }">{{ item.completed_sessions || 0 }} / {{ item.total_sessions }}</template>
 			<template #item.paid="{ item }">{{ Math.round((item.paid_pct || 0) * 100) }}%</template>
 			<template #item.actions="{ item }">
@@ -85,6 +89,9 @@ import { call, notifySuccess, searchLinkOptions } from "../client.js";
 import { treatmentStatusColor } from "../constants.js";
 import NewTreatmentDialog from "../components/NewTreatmentDialog.vue";
 import TreatmentDialog from "../components/TreatmentDialog.vue";
+import { useReferences } from "../references.js";
+
+const refs = useReferences();
 
 const rows = ref([]);
 const loading = ref(false);

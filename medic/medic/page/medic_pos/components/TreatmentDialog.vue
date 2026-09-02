@@ -12,12 +12,12 @@
 			<v-divider />
 
 			<v-card-text>
-				<v-text-field
-					:model-value="plan.invoice"
+				<ReferenceField
+					:value="plan.invoice"
 					:label="__('Invoice')"
-					prepend-inner-icon="mdi-receipt-text-outline"
-					readonly
+					icon="mdi-receipt-text-outline"
 					class="mb-3"
+					@open="refs.openInvoice(plan.invoice)"
 				/>
 
 				<!-- Payment progress -->
@@ -86,7 +86,7 @@
 					<tbody>
 						<tr v-for="s in plan.sessions" :key="s.name">
 							<td>{{ s.session_no }}</td>
-							<td>{{ s.name }}</td>
+							<td><a class="medic-ref-link" @click="refs.openAppointment(s.name)">{{ s.name }}</a></td>
 							<td>{{ formatDate(s.appointment_date) }}</td>
 							<td>
 								<v-chip size="x-small" variant="tonal" :color="appointmentStatusColor(s.appointment_status)">
@@ -141,6 +141,10 @@ import { call, formatCurrency, notifySuccess } from "../client.js";
 import { appointmentStatusColor, treatmentStatusColor } from "../constants.js";
 import SplitPaymentDialog from "./SplitPaymentDialog.vue";
 import DoctorDatePicker from "./DoctorDatePicker.vue";
+import ReferenceField from "./ReferenceField.vue";
+import { useReferences } from "../references.js";
+
+const refs = useReferences();
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },

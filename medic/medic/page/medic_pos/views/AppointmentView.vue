@@ -64,13 +64,13 @@
 					<v-text-field :model-value="doc.service_name || doc.service" :label="__('Service')" prepend-inner-icon="mdi-medical-bag" readonly />
 				</v-col>
 				<v-col cols="12" md="6">
-					<v-text-field :model-value="doc.invoice" :label="__('Invoice')" prepend-inner-icon="mdi-receipt-text-outline" readonly />
+					<ReferenceField :value="doc.invoice" :label="__('Invoice')" icon="mdi-receipt-text-outline" @open="refs.openInvoice(doc.invoice)" />
 				</v-col>
 				<v-col cols="12" md="6">
 					<v-text-field :model-value="doc.queue" :label="__('Queue')" prepend-inner-icon="mdi-counter" readonly />
 				</v-col>
 				<v-col v-if="doc.treatment_plan" cols="12" md="6">
-					<v-text-field :model-value="doc.treatment_plan" :label="__('Treatment Plan')" prepend-inner-icon="mdi-clipboard-pulse-outline" readonly />
+					<ReferenceField :value="doc.treatment_plan" :label="__('Treatment Plan')" icon="mdi-clipboard-pulse-outline" @open="refs.openTreatmentPlan(doc.treatment_plan)" />
 				</v-col>
 			</v-row>
 
@@ -214,6 +214,10 @@ import { ACTION_TYPES, appointmentStatusColor } from "../constants.js";
 import AppointmentActionDialog from "../components/AppointmentActionDialog.vue";
 import PrescriptionForm from "../components/PrescriptionForm.vue";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
+import ReferenceField from "../components/ReferenceField.vue";
+import { useReferences } from "../references.js";
+
+const refs = useReferences();
 
 const props = defineProps({ name: { type: String, default: null } });
 const emit = defineEmits(["back"]);
