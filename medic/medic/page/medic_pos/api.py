@@ -730,6 +730,8 @@ def create_treatment_plan_invoice(name):
 def _plan_dict(plan):
 	data = plan.as_dict() if hasattr(plan, "as_dict") else dict(plan)
 	data["service_name"] = frappe.db.get_value("Item", data.get("service"), "item_name")
+	data["customer_name"] = frappe.db.get_value("Customer", data.get("customer"), "customer_name")
+	data["doctor_name"] = frappe.db.get_value("Employee", data.get("employee"), "employee_name")
 	data.update(_invoice_financials(data.get("invoice")))
 	company = _company()
 	data["currency"] = frappe.db.get_value("Company", company, "default_currency") if company else None
@@ -1047,6 +1049,9 @@ def get_sales_invoice(name):
 	"""Header, line items and payment history for the invoice details dialog."""
 	si = frappe.get_doc("Sales Invoice", name)
 	data = {field: si.get(field) for field in SALES_INVOICE_LIST_FIELDS}
+	# Source references so the details view can link back to its appointment / plan.
+	data["patient_appointment"] = si.get("patient_appointment")
+	data["treatment_plan"] = si.get("treatment_plan")
 	data["items"] = [
 		{
 			"item_code": row.item_code,

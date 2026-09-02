@@ -4,7 +4,9 @@ import PatientView from "../views/PatientView.vue";
 import AppointmentsView from "../views/AppointmentsView.vue";
 import AppointmentView from "../views/AppointmentView.vue";
 import TreatmentsView from "../views/TreatmentsView.vue";
+import TreatmentView from "../views/TreatmentView.vue";
 import InvoicesView from "../views/InvoicesView.vue";
+import InvoiceView from "../views/InvoiceView.vue";
 import ProfileView from "../views/ProfileView.vue";
 import ScheduleView from "../views/ScheduleView.vue";
 import PrescriptionsView from "../views/PrescriptionsView.vue";
@@ -86,9 +88,19 @@ const routes = [
 		component: TreatmentsView,
 	},
 	{
+		path: "/app/medic-pos/treatment/:name?",
+		name: "treatment",
+		component: TreatmentView,
+	},
+	{
 		path: "/app/medic-pos/invoices",
 		name: "invoices",
 		component: InvoicesView,
+	},
+	{
+		path: "/app/medic-pos/invoice/:name?",
+		name: "invoice",
+		component: InvoiceView,
 	},
 	{
 		path: "/app/medic-pos/pharmacy/prescriptions",

@@ -87,7 +87,7 @@
 					color="primary"
 					icon="mdi-eye"
 					:title="__('View details')"
-					@click="openDetails(item.name)"
+					@click="refs.openInvoice(item.name)"
 				/>
 			</template>
 		</v-data-table>
@@ -113,8 +113,6 @@
 		require-full
 		@paid="load"
 	/>
-
-	<InvoiceDetailsDialog v-model="detailsOpen" :name="detailsName" @paid="load" />
 </template>
 
 <script setup>
@@ -122,7 +120,9 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { call, formatCurrency, searchLinkOptions } from "../client.js";
 import { SALES_INVOICE_STATUS, invoiceStatusColor } from "../constants.js";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
-import InvoiceDetailsDialog from "../components/InvoiceDetailsDialog.vue";
+import { useReferences } from "../references.js";
+
+const refs = useReferences();
 
 const rows = ref([]);
 const loading = ref(false);
@@ -133,8 +133,6 @@ const payOpen = ref(false);
 const payTarget = ref({});
 const payActionOpen = ref(false);
 const payActionTarget = ref({});
-const detailsOpen = ref(false);
-const detailsName = ref(null);
 
 const headers = computed(() => [
 	{ title: __("Invoice"), key: "name" },
@@ -171,11 +169,6 @@ function openPay(item) {
 function openPayAction(item) {
 	payActionTarget.value = item;
 	payActionOpen.value = true;
-}
-
-function openDetails(name) {
-	detailsName.value = name;
-	detailsOpen.value = true;
 }
 
 onMounted(() => {

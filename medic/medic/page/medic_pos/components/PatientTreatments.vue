@@ -29,7 +29,7 @@
 					<td>{{ p.completed_sessions || 0 }} / {{ p.total_sessions }}</td>
 					<td>{{ Math.round((p.paid_pct || 0) * 100) }}%</td>
 					<td class="text-end">
-						<v-btn size="small" variant="tonal" color="primary" icon="mdi-eye" :title="__('Open')" @click="openPlan(p.name)" />
+						<v-btn size="small" variant="tonal" color="primary" icon="mdi-eye" :title="__('Open')" @click="refs.openTreatmentPlan(p.name)" />
 					</td>
 				</tr>
 				<tr v-if="!loading && !plans.length">
@@ -39,7 +39,6 @@
 		</v-table>
 
 		<NewTreatmentDialog v-model="newOpen" :customer="customer" @created="load" />
-		<TreatmentDialog v-model="detailOpen" :name="selected" @changed="load" />
 	</div>
 </template>
 
@@ -48,15 +47,14 @@ import { onMounted, ref } from "vue";
 import { call } from "../client.js";
 import { treatmentStatusColor } from "../constants.js";
 import NewTreatmentDialog from "./NewTreatmentDialog.vue";
-import TreatmentDialog from "./TreatmentDialog.vue";
+import { useReferences } from "../references.js";
 
 const props = defineProps({ customer: { type: String, default: null } });
 
+const refs = useReferences();
 const plans = ref([]);
 const loading = ref(false);
 const newOpen = ref(false);
-const detailOpen = ref(false);
-const selected = ref(null);
 
 async function load() {
 	if (!props.customer) return;
@@ -66,11 +64,6 @@ async function load() {
 	} finally {
 		loading.value = false;
 	}
-}
-
-function openPlan(name) {
-	selected.value = name;
-	detailOpen.value = true;
 }
 
 onMounted(load);

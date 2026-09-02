@@ -73,14 +73,13 @@
 					color="primary"
 					icon="mdi-eye"
 					:title="__('Open')"
-					@click="openPlan(item.name)"
+					@click="refs.openTreatmentPlan(item.name)"
 				/>
 			</template>
 		</v-data-table>
 	</v-card>
 
 	<NewTreatmentDialog v-model="newOpen" @created="load" />
-	<TreatmentDialog v-model="detailOpen" :name="selected" @changed="load" />
 </template>
 
 <script setup>
@@ -88,7 +87,6 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { call, notifySuccess, searchLinkOptions } from "../client.js";
 import { treatmentStatusColor } from "../constants.js";
 import NewTreatmentDialog from "../components/NewTreatmentDialog.vue";
-import TreatmentDialog from "../components/TreatmentDialog.vue";
 import { useReferences } from "../references.js";
 
 const refs = useReferences();
@@ -96,8 +94,6 @@ const refs = useReferences();
 const rows = ref([]);
 const loading = ref(false);
 const newOpen = ref(false);
-const detailOpen = ref(false);
-const selected = ref(null);
 const creatingInvoice = ref(null);
 const customerOptions = ref([]);
 const employeeOptions = ref([]);
@@ -133,11 +129,6 @@ async function load() {
 	} finally {
 		loading.value = false;
 	}
-}
-
-function openPlan(name) {
-	selected.value = name;
-	detailOpen.value = true;
 }
 
 async function createInvoice(name) {
