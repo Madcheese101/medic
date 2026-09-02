@@ -492,6 +492,10 @@ def complete_appointment(name):
 		frappe.throw(_("Appointment must be submitted."))
 	if not pa.queue:
 		frappe.throw(_("Appointment must be checked in before completing."))
+	# Count the treatment-plan session toward the plan on completion (once).
+	if pa.treatment_plan and pa.appointment_status != "مكتمل":
+		plan = frappe.get_doc("Treatment Plan", pa.treatment_plan)
+		plan.db_set("completed_sessions", cint(plan.completed_sessions) + 1)
 	pa.db_set("appointment_status", "مكتمل")
 	return {"appointment_status": "مكتمل"}
 
@@ -941,8 +945,8 @@ def check_in(appointment):
 	q = _next_queue(appt.employee, appt.appointment_date)
 	appt.db_set("queue", q)
 	if appt.treatment_plan:
-		plan.db_set("completed_sessions", cint(plan.completed_sessions) + 1)
 		# Queuing the session means its gate passed; reflect that on the appointment.
+		# The session only counts toward the plan once the doctor completes it.
 		if appt.appointment_status != "مؤكد":
 			appt.db_set("appointment_status", "مؤكد")
 	return q
