@@ -89,7 +89,7 @@
 					:title="__('Confirm & Pay')"
 					:loading="confirming === item.name"
 					class="mr-1"
-					@click="confirmAndPay(item.name)"
+					@click="confirmAndPay(item)"
 				/>
 				<v-btn
 					size="small"
@@ -123,6 +123,7 @@
 		:currency="payTarget.currency"
 		method="pay_appointment"
 		:extra-args="{ name: payTarget.name }"
+		:require-full="payTarget.appointment_type === 'كشف'"
 		@paid="load"
 	/>
 </template>
@@ -200,11 +201,12 @@ function view(name) {
 }
 
 // Ensure the invoice exists (the "confirm" step), then open the pay dialog with its totals.
-async function confirmAndPay(name) {
-	confirming.value = name;
+// The appointment type rides along so كشف can require full payment in the dialog.
+async function confirmAndPay(item) {
+	confirming.value = item.name;
 	try {
-		const fin = await call("confirm_appointment_invoice", { name });
-		payTarget.value = { name, ...fin };
+		const fin = await call("confirm_appointment_invoice", { name: item.name });
+		payTarget.value = { name: item.name, appointment_type: item.appointment_type, ...fin };
 		payOpen.value = true;
 	} finally {
 		confirming.value = null;

@@ -461,6 +461,13 @@ def pay_appointment(name, payments):
 		# the payments below reduce the outstanding, and we flip to مؤكد once it clears.
 		si.submit()
 
+	# A كشف must be settled in full in one go; partial payments are not allowed.
+	if pa.appointment_type == "كشف":
+		current_outstanding = flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))
+		total_paying = sum(flt(p.get("amount")) for p in payments)
+		if total_paying + 0.01 < current_outstanding:
+			frappe.throw(_("A كشف appointment must be paid in full."))
+
 	for p in payments:
 		add_payment(
 			invoice, p.get("amount"), p.get("mode_of_payment"),
