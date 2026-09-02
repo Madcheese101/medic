@@ -95,6 +95,15 @@
 					size="small"
 					variant="tonal"
 					color="primary"
+					icon="mdi-printer"
+					:title="__('Print')"
+					class="mr-1"
+					@click="printDoc('Patient Appointment', item.name)"
+				/>
+				<v-btn
+					size="small"
+					variant="tonal"
+					color="primary"
 					icon="mdi-eye"
 					:title="__('View')"
 					@click="view(item.name)"
@@ -120,7 +129,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { call, notifySuccess, searchLinkOptions } from "../client.js";
+import { call, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
 import { APPOINTMENT_STATUS, appointmentStatusColor } from "../constants.js";
 import { useUiStore } from "../stores/ui.js";
 import NewAppointmentForm from "../components/NewAppointmentForm.vue";

@@ -85,6 +85,15 @@
 					size="small"
 					variant="tonal"
 					color="primary"
+					icon="mdi-printer"
+					:title="__('Print')"
+					class="mr-1"
+					@click="printDoc('Sales Invoice', item.name)"
+				/>
+				<v-btn
+					size="small"
+					variant="tonal"
+					color="primary"
 					icon="mdi-eye"
 					:title="__('View details')"
 					@click="refs.openInvoice(item.name)"
@@ -117,7 +126,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { call, formatCurrency, searchLinkOptions } from "../client.js";
+import { call, formatCurrency, printDoc, searchLinkOptions } from "../client.js";
 import { SALES_INVOICE_STATUS, invoiceStatusColor } from "../constants.js";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import { useReferences } from "../references.js";

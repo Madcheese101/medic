@@ -9,6 +9,14 @@
 				@click="emit('back')"
 			/>
 			<span class="text-truncate">{{ plan.name || __("Treatment Plan") }}</span>
+			<v-btn
+				v-if="plan.name"
+				variant="text"
+				icon="mdi-printer"
+				:title="__('Print')"
+				class="ml-1"
+				@click="printDoc('Treatment Plan', plan.name)"
+			/>
 			<v-spacer />
 			<v-chip :color="treatmentStatusColor(plan.status)" variant="flat" size="large">
 				{{ plan.status || "—" }}
@@ -145,7 +153,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRtl } from "vuetify";
-import { call, formatCurrency, notifySuccess } from "../client.js";
+import { call, formatCurrency, notifySuccess, printDoc } from "../client.js";
 import { appointmentStatusColor, treatmentStatusColor } from "../constants.js";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import DoctorDatePicker from "../components/DoctorDatePicker.vue";

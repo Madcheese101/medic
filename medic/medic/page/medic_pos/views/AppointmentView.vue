@@ -9,6 +9,14 @@
 				@click="emit('back')"
 			/>
 			<span class="text-truncate">{{ doc.name || __("Appointment") }}</span>
+			<v-btn
+				v-if="doc.name"
+				variant="text"
+				icon="mdi-printer"
+				:title="__('Print')"
+				class="ml-1"
+				@click="printDoc('Patient Appointment', doc.name)"
+			/>
 			<v-spacer />
 			<v-menu v-if="doc.docstatus === 1 && !isCompleted" location="bottom end">
 				<template #activator="{ props: menuProps }">
@@ -209,7 +217,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRtl } from "vuetify";
-import { call, confirmAction, notifySuccess } from "../client.js";
+import { call, confirmAction, notifySuccess, printDoc } from "../client.js";
 import { ACTION_TYPES, appointmentStatusColor } from "../constants.js";
 import AppointmentActionDialog from "../components/AppointmentActionDialog.vue";
 import PrescriptionForm from "../components/PrescriptionForm.vue";

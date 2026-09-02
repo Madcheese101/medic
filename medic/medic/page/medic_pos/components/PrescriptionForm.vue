@@ -10,6 +10,14 @@
 			/>
 			<v-icon icon="mdi-prescription" class="mr-2" />
 			<span class="text-truncate">{{ isNew ? __("New Prescription") : prescription }}</span>
+			<v-btn
+				v-if="!isNew"
+				variant="text"
+				icon="mdi-printer"
+				:title="__('Print')"
+				class="ml-1"
+				@click="printDoc('Prescription', prescription)"
+			/>
 			<v-spacer />
 			<v-chip v-if="invoiceCreated" color="primary" variant="flat" size="large">
 				{{ __("Invoiced") }}
@@ -150,7 +158,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { useDisplay, useRtl } from "vuetify";
-import { call, notifySuccess, searchLinkOptions } from "../client.js";
+import { call, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
 import { PRESCRIPTION_PER, PRESCRIPTION_ROUTES } from "../constants.js";
 
 const props = defineProps({

@@ -71,6 +71,15 @@
 					size="small"
 					variant="tonal"
 					color="primary"
+					icon="mdi-printer"
+					:title="__('Print')"
+					class="mr-1"
+					@click="printDoc('Treatment Plan', item.name)"
+				/>
+				<v-btn
+					size="small"
+					variant="tonal"
+					color="primary"
 					icon="mdi-eye"
 					:title="__('Open')"
 					@click="refs.openTreatmentPlan(item.name)"
@@ -84,7 +93,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { call, notifySuccess, searchLinkOptions } from "../client.js";
+import { call, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
 import { treatmentStatusColor } from "../constants.js";
 import NewTreatmentDialog from "../components/NewTreatmentDialog.vue";
 import { useReferences } from "../references.js";

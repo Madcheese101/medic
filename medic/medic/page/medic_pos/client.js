@@ -64,6 +64,20 @@ export function confirmAction(message) {
 	});
 }
 
+// Opens the standalone print view in a new tab. Omitting `format` makes Frappe
+// use the doctype's default print format; trigger_print fires the print dialog.
+export function printDoc(doctype, name) {
+	if (!name) return;
+	const params = new URLSearchParams({
+		doctype,
+		name,
+		trigger_print: "1",
+		no_letterhead: "0",
+		_lang: frappe.boot.lang || "en",
+	});
+	window.open(`/printview?${params.toString()}`, "_blank");
+}
+
 export function formatCurrency(value, currency) {
 	// Frappe exposes format_currency as a global (returns a plain string);
 	// frappe.format(Currency) instead returns an HTML <div>, so avoid it.

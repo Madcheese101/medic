@@ -9,6 +9,14 @@
 				@click="emit('back')"
 			/>
 			<span class="text-truncate">{{ doc.name || __("Invoice") }}</span>
+			<v-btn
+				v-if="doc.name"
+				variant="text"
+				icon="mdi-printer"
+				:title="__('Print')"
+				class="ml-1"
+				@click="printDoc('Sales Invoice', doc.name)"
+			/>
 			<v-spacer />
 			<v-chip :color="invoiceStatusColor(doc.status)" variant="flat" size="large">
 				{{ doc.status || "—" }}
@@ -106,7 +114,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRtl } from "vuetify";
-import { call, formatCurrency } from "../client.js";
+import { call, formatCurrency, printDoc } from "../client.js";
 import { invoiceStatusColor } from "../constants.js";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import ReferenceField from "../components/ReferenceField.vue";
