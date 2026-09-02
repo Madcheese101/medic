@@ -67,7 +67,7 @@
 			<template #item.queue="{ item }">
 				<span v-if="item.queue">{{ item.queue }}</span>
 				<v-btn
-					v-else-if="item.docstatus === 1"
+					v-else-if="item.docstatus === 1 && item.appointment_date === today"
 					size="small"
 					variant="tonal"
 					color="primary"
@@ -131,6 +131,7 @@ const emit = defineEmits(["navigate"]);
 
 const uiStore = useUiStore();
 
+const today = frappe.datetime.get_today();
 const rows = ref([]);
 const loading = ref(false);
 const creating = ref(false);

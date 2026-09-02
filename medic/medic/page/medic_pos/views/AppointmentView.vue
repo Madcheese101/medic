@@ -244,8 +244,14 @@ const isCompleted = computed(() => doc.value.appointment_status === "مكتمل"
 const canConfirm = computed(
 	() => doc.value.docstatus === 1 && doc.value.appointment_status === "انتظار" && !isTreatmentSession.value
 );
-// Check-in assigns the queue; available once submitted and not yet queued.
-const canCheckIn = computed(() => doc.value.docstatus === 1 && !doc.value.queue && !isTreatmentSession.value);
+// Check-in assigns the queue; available once submitted, not yet queued, and only on the appointment's own day.
+const canCheckIn = computed(
+	() =>
+		doc.value.docstatus === 1 &&
+		!doc.value.queue &&
+		!isTreatmentSession.value &&
+		doc.value.appointment_date === frappe.datetime.get_today()
+);
 // Complete is offered once the patient has a queue number, until it is marked مكتمل.
 const canComplete = computed(() => doc.value.docstatus === 1 && !!doc.value.queue && !isCompleted.value);
 
