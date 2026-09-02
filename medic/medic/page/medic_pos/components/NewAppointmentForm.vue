@@ -180,6 +180,7 @@ import { call, customSearchLink, notifySuccess, searchLinkOptions } from "../cli
 import { APPOINTMENT_TYPES, BLOOD_TYPES } from "../constants.js";
 import DoctorDatePicker from "./DoctorDatePicker.vue";
 
+const props = defineProps({ initialNew: { type: Boolean, default: false } });
 const emit = defineEmits(["created", "cancel"]);
 
 const { isRtl } = useRtl();
@@ -192,7 +193,7 @@ const step2Form = ref(null);
 const saving = ref(false);
 
 // Step 1 state: either an existing customer, or a new patient to create.
-const isNew = ref(false);
+const isNew = ref(props.initialNew);
 const customer = ref(null);
 const patient = reactive({
 	customer_name: "",

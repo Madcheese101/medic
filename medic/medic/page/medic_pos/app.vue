@@ -64,6 +64,32 @@
 
 			<v-menu location="bottom end">
 				<template #activator="{ props }">
+					<v-btn
+						v-bind="props"
+						variant="text"
+						class="text-none px-2 mr-1"
+						prepend-icon="mdi-calendar-plus"
+						append-icon="mdi-chevron-down"
+					>
+						<span class="d-none d-sm-inline">{{ __("New") }}</span>
+					</v-btn>
+				</template>
+				<v-list density="comfortable" min-width="220">
+					<v-list-item
+						prepend-icon="mdi-account-plus-outline"
+						:title="__('Create Direct appointment')"
+						@click="createAppointment(true)"
+					/>
+					<v-list-item
+						prepend-icon="mdi-calendar-plus"
+						:title="__('Create Appointment')"
+						@click="createAppointment(false)"
+					/>
+				</v-list>
+			</v-menu>
+
+			<v-menu location="bottom end">
+				<template #activator="{ props }">
 					<v-btn v-bind="props" variant="text" class="text-none px-2">
 						<v-avatar size="32" color="surface" class="mr-2">
 							<v-img v-if="profileImage" :src="profileImage" :alt="fullName" />
@@ -111,8 +137,10 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useDisplay } from "vuetify";
 import { useDefaultsStore } from "./stores/defaults.js";
+import { useUiStore } from "./stores/ui.js";
 
 const defaultsStore = useDefaultsStore();
+const uiStore = useUiStore();
 const { mobile } = useDisplay();
 const drawer = ref(true);
 const rail = ref(false);
@@ -157,6 +185,12 @@ function selectView(value, params = {}) {
 
 function goBack() {
 	router.back();
+}
+
+// Ask the Appointments view to open its create form; newPatient presets "Is new Patient".
+function createAppointment(newPatient) {
+	uiStore.requestNewAppointment(newPatient);
+	selectView("appointments");
 }
 
 // On mobile the button opens/closes the drawer; on desktop it collapses it to a rail.

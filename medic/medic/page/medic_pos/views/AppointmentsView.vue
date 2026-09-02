@@ -44,7 +44,7 @@
 			<v-btn color="primary" variant="tonal" prepend-icon="mdi-calendar-account" class="mr-2" @click="sessionOpen = true">
 				{{ __("New Session") }}
 			</v-btn>
-			<v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="creating = true">
+			<v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="openCreate(false)">
 				{{ __("New Appointment") }}
 			</v-btn>
 		</v-card-text>
@@ -103,7 +103,7 @@
 		</v-data-table>
 	</v-card>
 
-	<NewAppointmentForm v-else @created="onCreated" @cancel="creating = false" />
+	<NewAppointmentForm v-else :initial-new="createNew" @created="onCreated" @cancel="creating = false" />
 
 	<NewSessionDialog v-model="sessionOpen" @created="load" />
 
@@ -119,18 +119,22 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { call, notifySuccess, searchLinkOptions } from "../client.js";
 import { APPOINTMENT_STATUS, appointmentStatusColor } from "../constants.js";
+import { useUiStore } from "../stores/ui.js";
 import NewAppointmentForm from "../components/NewAppointmentForm.vue";
 import NewSessionDialog from "../components/NewSessionDialog.vue";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 
 const emit = defineEmits(["navigate"]);
 
+const uiStore = useUiStore();
+
 const rows = ref([]);
 const loading = ref(false);
 const creating = ref(false);
+const createNew = ref(false);
 const sessionOpen = ref(false);
 const checkingIn = ref(null);
 const confirming = ref(null);
@@ -196,6 +200,23 @@ async function confirmAndPay(name) {
 		confirming.value = null;
 	}
 }
+
+function openCreate(newPatient) {
+	createNew.value = !!newPatient;
+	creating.value = true;
+}
+
+// The app-bar "New" menu queues a request here; open the form and clear it.
+// immediate covers arriving from another view; the watch covers already being here.
+watch(
+	() => uiStore.pendingAppointment,
+	(req) => {
+		if (!req) return;
+		openCreate(req.newPatient);
+		uiStore.consumeNewAppointment();
+	},
+	{ immediate: true }
+);
 
 function onCreated() {
 	creating.value = false;
