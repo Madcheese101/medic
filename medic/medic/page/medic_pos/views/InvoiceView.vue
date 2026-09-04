@@ -17,6 +17,14 @@
 				class="ml-1"
 				@click="printDoc('Sales Invoice', doc.name)"
 			/>
+			<v-btn
+				v-if="canReturn"
+				variant="text"
+				icon="mdi-cash-refund"
+				:title="__('Return')"
+				class="ml-1"
+				@click="returnOpen = true"
+			/>
 			<v-spacer />
 			<v-chip :color="invoiceStatusColor(doc.status)" variant="flat" size="large">
 				{{ doc.status || "—" }}
@@ -109,6 +117,8 @@
 		require-full
 		@paid="load"
 	/>
+
+	<ReturnInvoiceDialog v-model="returnOpen" :invoice="doc.name" @returned="load" />
 </template>
 
 <script setup>
@@ -118,6 +128,7 @@ import { call, formatCurrency, printDoc } from "../client.js";
 import { invoiceStatusColor } from "../constants.js";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import ReferenceField from "../components/ReferenceField.vue";
+import ReturnInvoiceDialog from "../components/ReturnInvoiceDialog.vue";
 import { useReferences } from "../references.js";
 
 const props = defineProps({ name: { type: String, default: null } });
@@ -128,9 +139,17 @@ const { isRtl } = useRtl();
 
 const loading = ref(false);
 const payOpen = ref(false);
+const returnOpen = ref(false);
 const doc = ref({ items: [], payments: [] });
 
 const backIcon = computed(() => (isRtl.value ? "mdi-arrow-right" : "mdi-arrow-left"));
+// Case 1 (paid appointment invoice, not action/plan) or Case 2 (any plan invoice); the dialog re-checks.
+const canReturn = computed(() => {
+	const d = doc.value;
+	if (!d.name) return false;
+	if (d.treatment_plan) return true;
+	return !!d.patient_appointment && !d.is_action_invoice && Number(d.outstanding_amount) < Number(d.grand_total);
+});
 
 function formatDate(value) {
 	return value ? frappe.datetime.str_to_user(value) : "";

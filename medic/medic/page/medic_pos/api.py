@@ -932,6 +932,8 @@ def check_in(appointment):
 	appt = frappe.get_doc("Patient Appointment", appointment)
 	if appt.queue:
 		return appt.queue  # already checked in
+	if appt.appointment_status == "ملغي":
+		frappe.throw(_("Cancelled appointments cannot be checked in."))
 
 	if appt.treatment_plan:
 		plan = frappe.get_doc("Treatment Plan", appt.treatment_plan)
@@ -1093,6 +1095,180 @@ def get_sales_invoice(name):
 		)
 	data["payments"] = payments
 	return data
+
+
+# ---------------------------------------------------------------- returns / refunds
+
+
+def _return_kind(si):
+	"""Which return case an invoice qualifies for, or (None, reason).
+	Case 1 (appointment): a paid appointment invoice that is not an action or a plan invoice.
+	Case 2 (treatment_plan): any treatment-plan invoice."""
+	if si.get("treatment_plan"):
+		return "treatment_plan", None
+	if si.get("is_action_invoice"):
+		return None, _("Action invoices cannot be returned here.")
+	if not si.get("patient_appointment"):
+		return None, _("Only appointment or treatment-plan invoices can be returned.")
+	if flt(si.outstanding_amount) >= flt(si.grand_total):
+		return None, _("Nothing has been paid on this invoice.")
+	return "appointment", None
+
+
+def _refunded_total(invoice):
+	"""Sum already refunded via submitted credit notes against this invoice (positive)."""
+	rows = frappe.get_all(
+		"Sales Invoice",
+		filters={"return_against": invoice, "docstatus": 1},
+		fields=["grand_total"],
+	)
+	return -sum(flt(r.grand_total) for r in rows)  # credit-note totals are negative
+
+
+@frappe.whitelist()
+def get_invoice_return_info(invoice):
+	"""What the return dialog needs to decide the case and the refundable amount."""
+	si = frappe.get_doc("Sales Invoice", invoice)
+	grand = flt(si.grand_total)
+	outstanding = flt(si.outstanding_amount)
+	paid = grand - outstanding
+	refunded = _refunded_total(invoice)
+	info = {
+		"invoice": invoice,
+		"currency": _company_currency(),
+		"grand_total": grand,
+		"outstanding": outstanding,
+		"paid": paid,
+		"refunded": refunded,
+	}
+
+	kind, reason = _return_kind(si)
+	info["kind"] = kind
+	if not kind:
+		info["reason"] = reason
+		return info
+
+	if kind == "appointment":
+		max_refund = max(paid - refunded, 0.0)
+		if max_refund <= 0.01:
+			info["kind"] = None
+			info["reason"] = _("This invoice has already been fully refunded.")
+			return info
+		info["max_refund"] = max_refund
+		return info
+
+	# treatment_plan: only the completed sessions' share is owed; refund the rest of what was paid.
+	plan = frappe.get_doc("Treatment Plan", si.treatment_plan)
+	total_sessions = cint(plan.total_sessions)
+	completed = cint(plan.completed_sessions)
+	per_session = grand / total_sessions if total_sessions else 0.0
+	completed_share = per_session * completed
+	info.update(
+		{
+			"total_sessions": total_sessions,
+			"completed_sessions": completed,
+			"per_session": per_session,
+			"completed_share": completed_share,
+			"refundable": max(paid - completed_share - refunded, 0.0),
+			"shortfall": max(completed_share - paid, 0.0),
+		}
+	)
+	return info
+
+
+def _add_refund(return_invoice, amount, mode_of_payment, reference_no=None, reference_date=None):
+	"""Refund Payment Entry against a credit note. Mirrors add_payment but the return invoice's
+	negative outstanding makes get_payment_entry produce a `Pay` entry, so we override paid_from."""
+	from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+
+	# The credit note's outstanding is negative, so the allocation must be negative too;
+	# get_payment_entry still produces a positive `Pay` paid_amount (abs of it).
+	pe = get_payment_entry("Sales Invoice", return_invoice, party_amount=-flt(amount))
+	pe.mode_of_payment = mode_of_payment
+	# Money leaves the mode's own account (the Pay-side counterpart of add_payment's paid_to).
+	account = frappe.db.get_value(
+		"Mode of Payment Account", {"parent": mode_of_payment, "company": pe.company}, "default_account"
+	)
+	if account:
+		pe.paid_from = account
+	if reference_no:
+		pe.reference_no = reference_no
+	if reference_date:
+		pe.reference_date = reference_date
+	pe.insert()
+	pe.submit()
+	return pe.name
+
+
+@frappe.whitelist()
+def create_invoice_return(invoice, amount, payments):
+	"""Issue a credit note for `amount` against `invoice` and refund it through `payments`.
+	The original invoice's outstanding is left untouched."""
+	amount = flt(amount)
+	payments = frappe.parse_json(payments) or []
+	si = frappe.get_doc("Sales Invoice", invoice)
+
+	kind, reason = _return_kind(si)
+	if not kind:
+		frappe.throw(reason)
+
+	grand = flt(si.grand_total)
+	paid = grand - flt(si.outstanding_amount)
+	refunded = _refunded_total(invoice)
+
+	if amount <= 0:
+		frappe.throw(_("Return amount must be greater than zero."))
+	if kind == "appointment":
+		if amount > paid - refunded + 0.01:
+			frappe.throw(_("Return amount cannot exceed the refundable amount."))
+	else:
+		plan = frappe.get_doc("Treatment Plan", si.treatment_plan)
+		total_sessions = cint(plan.total_sessions)
+		per_session = grand / total_sessions if total_sessions else 0.0
+		completed_share = per_session * cint(plan.completed_sessions)
+		refundable = max(paid - completed_share - refunded, 0.0)
+		if refundable <= 0:
+			frappe.throw(_("This plan has no refundable amount."))
+		if abs(amount - refundable) > 0.01:
+			frappe.throw(_("Return amount must equal the refundable amount."))
+
+	if abs(sum(flt(p.get("amount")) for p in payments) - amount) > 0.01:
+		frappe.throw(_("Refund payments must add up to the return amount."))
+
+	# Credit note: one line tied to the original invoice row. Keep the original rate (ERPNext
+	# rejects a return rate above it) and carry the amount via a fractional negative qty.
+	src = si.items[0]
+	rate = flt(src.rate)
+	qty = -(amount / rate) if rate else -1
+	cn = frappe.new_doc("Sales Invoice")
+	cn.customer = si.customer
+	cn.company = si.company
+	cn.is_return = 1
+	cn.return_against = invoice
+	cn.append(
+		"items",
+		{"item_code": src.item_code, "sales_invoice_item": src.name, "qty": qty, "rate": rate or amount},
+	)
+	cn.insert()
+	cn.submit()
+
+	# Refund the credit note's actual total (guards against any qty*rate rounding drift).
+	if abs(-flt(cn.grand_total) - amount) > 0.01:
+		frappe.throw(_("Could not build a credit note for exactly {0}.").format(amount))
+
+	for p in payments:
+		_add_refund(
+			cn.name, p.get("amount"), p.get("mode_of_payment"),
+			p.get("reference_no"), p.get("reference_date"),
+		)
+
+	# Close out the source record.
+	if kind == "appointment":
+		frappe.db.set_value("Patient Appointment", si.patient_appointment, "appointment_status", "ملغي")
+	else:
+		frappe.db.set_value("Treatment Plan", si.treatment_plan, "status", "Completed")
+
+	return {"credit_note": cn.name, "amount": amount}
 
 
 # ---------------------------------------------------------------- pharmacy / POS

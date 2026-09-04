@@ -67,7 +67,7 @@
 			<template #item.queue="{ item }">
 				<span v-if="item.queue">{{ item.queue }}</span>
 				<v-btn
-					v-else-if="item.docstatus === 1 && item.appointment_date === today"
+					v-else-if="item.docstatus === 1 && item.appointment_date === today && item.appointment_status !== 'ملغي'"
 					size="small"
 					variant="tonal"
 					color="primary"

@@ -262,6 +262,7 @@ const canCheckIn = computed(
 		doc.value.docstatus === 1 &&
 		!doc.value.queue &&
 		!isTreatmentSession.value &&
+		doc.value.appointment_status !== "ملغي" &&
 		doc.value.appointment_date === frappe.datetime.get_today()
 );
 // Complete is offered once the patient has a queue number, until it is marked مكتمل.

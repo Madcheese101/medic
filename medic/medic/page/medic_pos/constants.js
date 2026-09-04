@@ -6,7 +6,7 @@ export const APPOINTMENT_TYPES = ["كشف", "علاج", "مراجعة", "متا�
 
 // Mirrors the Appointment Actions action_type Select options.
 export const ACTION_TYPES = ["علاج", "تحليل", "وصفة طبية"];
-export const APPOINTMENT_STATUS = ["انتظار", "غير مؤكد", "مؤكد", "مكتمل"];
+export const APPOINTMENT_STATUS = ["انتظار", "غير مؤكد", "مؤكد", "مكتمل", "ملغي"];
 
 // Mirrors the Prescription Items Select options (the blank first route option is dropped).
 export const PRESCRIPTION_ROUTES = [
@@ -35,9 +35,9 @@ export const PRESCRIPTION_ROUTES = [
 ];
 export const PRESCRIPTION_PER = ["Day", "Week"];
 
-// انتظار Pending, غير مؤكد Not Confirmed, مؤكد Confirmed, مكتمل Completed.
+// انتظار Pending, غير مؤكد Not Confirmed, مؤكد Confirmed, مكتمل Completed, ملغي Cancelled.
 export function appointmentStatusColor(status) {
-	return { انتظار: "warning", "غير مؤكد": "info", مؤكد: "success", مكتمل: "primary" }[status] || "surface-variant";
+	return { انتظار: "warning", "غير مؤكد": "info", مؤكد: "success", مكتمل: "primary", ملغي: "error" }[status] || "surface-variant";
 }
 
 export function treatmentStatusColor(status) {
