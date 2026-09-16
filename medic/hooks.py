@@ -153,6 +153,7 @@ doc_events = {
 		"after_insert": "medic.events.on_customer_create"
 	},
 	"Sales Invoice": {
+		"on_submit": "medic.events.on_test_request_invoice_submit",
 		"on_cancel": "medic.events.on_sales_invoice_cancel",
 		# "on_submit": "medic.events.on_sales_invoice_submit",
 		# "on_update_after_submit": "medic.events.on_sales_invoice_submit",

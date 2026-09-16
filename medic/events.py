@@ -82,3 +82,32 @@ def on_sales_invoice_cancel(doc, method=None):
 	# action_exists = frappe.db.exists("Appointment Actions", {"invoice": doc.name})
 	# if action_exists:
 	# 	frappe.db.set_value("Appointment Actions", action_exists, "paid", 0)
+
+
+def on_test_request_invoice_submit(doc, method=None):
+	"""Seed a Test Request's result table from its invoiced Lab Test items on submit."""
+	tr_name = frappe.db.get_value("Test Request", {"sales_invoice": doc.name}, "name")
+	if not tr_name:
+		return
+
+	tr = frappe.get_doc("Test Request", tr_name)
+	existing = {r.item for r in tr.result}
+	added = False
+	for item in doc.items:
+		if item.item_code in existing:
+			continue
+		meta = frappe.db.get_value(
+			"Item", item.item_code, ["item_type", "stock_uom", "reference_range"], as_dict=True
+		)
+		if not meta or meta.item_type != "Lab Test":
+			continue
+		tr.append(
+			"result",
+			{"item": item.item_code, "uom": meta.stock_uom, "reference_range": meta.reference_range},
+		)
+		existing.add(item.item_code)
+		added = True
+
+	if added:
+		# The cashier who submits the invoice has no write access to Test Request.
+		tr.save(ignore_permissions=True)
