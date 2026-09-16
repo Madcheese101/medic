@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from frappe.desk.search import build_for_autosuggest, sanitize_searchfield, search_widget
+from frappe.query_builder import Order
 from frappe.utils import cint, flt, getdate, today
 
 PATIENT_FIELDS = ("customer_name", "date_of_birth", "custom_phone_number", "gender", "blood_type")
@@ -681,13 +682,36 @@ def _invoice_financials(invoice):
 	}
 
 
-# Shared by the list endpoints. The invoice.* fields LEFT JOIN the plan's Sales Invoice
-TREATMENT_PLAN_JOIN_FIELDS = (
-	"name", "status", "customer", "customer.customer_name as customer_name",
-	"employee", "employee.employee_name as doctor_name",
-	"service", "service.item_name as service_name", "total_sessions", "completed_sessions", "invoice",
-	"invoice.grand_total as grand_total", "invoice.outstanding_amount as outstanding_amount",
-)
+# Shared by the list endpoints. `invoice` is a plain Data field (not a Link), so it can't
+# be auto-joined via get_query's dotted fetch — build the joins explicitly instead.
+def _treatment_plans_query(filters, order_by_creation=False, limit=None):
+	tp = frappe.qb.DocType("Treatment Plan")
+	cust = frappe.qb.DocType("Customer")
+	emp = frappe.qb.DocType("Employee")
+	item = frappe.qb.DocType("Item")
+	si = frappe.qb.DocType("Sales Invoice")
+
+	q = (
+		frappe.qb.from_(tp)
+		.left_join(cust).on(cust.name == tp.customer)
+		.left_join(emp).on(emp.name == tp.employee)
+		.left_join(item).on(item.name == tp.service)
+		.left_join(si).on(si.name == tp.invoice)
+		.select(
+			tp.name, tp.status, tp.customer, cust.customer_name.as_("customer_name"),
+			tp.employee, emp.employee_name.as_("doctor_name"),
+			tp.service, item.item_name.as_("service_name"),
+			tp.total_sessions, tp.completed_sessions, tp.invoice,
+			si.grand_total.as_("grand_total"), si.outstanding_amount.as_("outstanding_amount"),
+		)
+	)
+	for field, value in filters.items():
+		q = q.where(tp[field] == value)
+	if order_by_creation:
+		q = q.orderby(tp.creation, order=Order.desc)
+	if limit:
+		q = q.limit(limit)
+	return q
 
 
 def _apply_financials(row):
@@ -800,11 +824,8 @@ def _plan_dict(plan):
 @frappe.whitelist()
 def get_treatment_plans(customer):
 	currency = _company_currency()
-	rows = frappe.qb.get_query(
-		"Treatment Plan",
-		fields=list(TREATMENT_PLAN_JOIN_FIELDS),
-		filters={"customer": customer, "docstatus": 1},
-		order_by="creation desc",
+	rows = _treatment_plans_query(
+		{"customer": customer, "docstatus": 1}, order_by_creation=True
 	).run(as_dict=True)
 	for r in rows:
 		_apply_financials(r)
@@ -818,11 +839,7 @@ def get_active_treatment_plans(customer=None):
 	if customer:
 		filters["customer"] = customer
 
-	rows = frappe.qb.get_query(
-		"Treatment Plan",
-		fields=list(TREATMENT_PLAN_JOIN_FIELDS),
-		filters=filters,
-	).run(as_dict=True)
+	rows = _treatment_plans_query(filters).run(as_dict=True)
 	out = []
 	for r in rows:
 		if cint(r.get("completed_sessions")) >= cint(r.get("total_sessions")):
@@ -843,13 +860,7 @@ def list_treatment_plans(customer=None, employee=None, status=None, limit=100):
 	if status:
 		filters["status"] = status
 
-	rows = frappe.qb.get_query(
-		"Treatment Plan",
-		fields=list(TREATMENT_PLAN_JOIN_FIELDS),
-		filters=filters,
-		order_by="creation desc",
-		limit=limit,
-	).run(as_dict=True)
+	rows = _treatment_plans_query(filters, order_by_creation=True, limit=limit).run(as_dict=True)
 	for r in rows:
 		_apply_financials(r)
 		# Deposit target for plans that have no invoice yet.
