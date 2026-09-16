@@ -52,6 +52,7 @@
 							item-props
 							:rules="[required]"
 							@update:search="searchItems"
+							@update:model-value="onItemChange"
 						/>
 					</v-col>
 					<v-col cols="12" sm="6" lg="3">
@@ -69,11 +70,11 @@
 							type="number"
 							min="1"
 							:label="__('Times')"
-							:rules="[positive]"
+							:rules="[schedulePositive]"
 						/>
 					</v-col>
 					<v-col cols="4" sm="4" lg="2">
-						<v-select v-model="entry.per" :items="PRESCRIPTION_PER" :label="__('Per')" :rules="[required]" />
+						<v-select v-model="entry.per" :items="PRESCRIPTION_PER" :label="__('Per')" :rules="[scheduleRequired]" />
 					</v-col>
 					<v-col cols="4" sm="4" lg="1">
 						<v-text-field
@@ -81,7 +82,7 @@
 							type="number"
 							min="1"
 							:label="__('For')"
-							:rules="[positive]"
+							:rules="[schedulePositive]"
 						/>
 					</v-col>
 					<v-col cols="12" sm="12" lg="1" class="d-flex align-center">
@@ -178,6 +179,9 @@ const postingDate = ref(frappe.datetime.get_today());
 const rows = ref([]);
 const options = reactive({ item: [] });
 const entry = reactive({ item: null, route: null, times: null, per: null, for: null });
+// True when the selected item is a Pharma item that requires a dosing schedule,
+// which makes Times/Per/For mandatory for that row.
+const requiresSchedule = ref(false);
 
 const backIcon = computed(() => (isRtl.value ? "mdi-arrow-right" : "mdi-arrow-left"));
 const isNew = computed(() => !props.prescription);
@@ -185,7 +189,9 @@ const isNew = computed(() => !props.prescription);
 const editable = computed(() => isNew.value || !invoiceCreated.value);
 
 const required = (value) => !!value || __("Required");
-const positive = (value) => Number(value) > 0 || __("Required");
+// Times/Per/For are only required for schedule-bound Pharma items.
+const scheduleRequired = (value) => !requiresSchedule.value || !!value || __("Required");
+const schedulePositive = (value) => !requiresSchedule.value || Number(value) > 0 || __("Required");
 
 function formatDate(value) {
 	return value ? frappe.datetime.str_to_user(value) : "";
@@ -197,12 +203,23 @@ async function searchItems(txt) {
 	options.item = await searchLinkOptions("Item", txt, filters, "item_name");
 }
 
+// Look up the chosen item's type/schedule flag to drive Times/Per/For validation.
+async function onItemChange(item) {
+	if (!item) {
+		requiresSchedule.value = false;
+		return;
+	}
+	const { message } = await frappe.db.get_value("Item", item, ["item_type", "requires_schedule"]);
+	requiresSchedule.value = message?.item_type === "Pharma" && !!message?.requires_schedule;
+}
+
 async function addRow() {
 	const { valid } = await itemForm.value.validate();
 	if (!valid) return;
 
 	rows.value.push({ ...entry });
 	Object.assign(entry, { item: null, route: null, times: null, per: null, for: null });
+	requiresSchedule.value = false;
 	itemForm.value.resetValidation();
 }
 

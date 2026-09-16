@@ -6,13 +6,13 @@
  "engine": "InnoDB",
  "field_order": [
   "service_parent_item_group",
+  "cashier_pos_profile",
   "column_break_ibqz",
   "doctors_default_designation",
   "section_break_qjdk",
   "enable_pharmacy",
   "pharmacy_item_group",
   "pharmacy_pos_profile",
-  "prescription_print_format",
   "column_break_zmkf",
   "enable_test_lab",
   "test_lab_item_group",
@@ -89,23 +89,22 @@
    "fieldtype": "Section Break"
   },
   {
-   "fieldname": "prescription_print_format",
-   "fieldtype": "Link",
-   "label": "Prescription Print Format",
-   "mandatory_depends_on": "eval:doc.enable_pharmacy",
-   "options": "Print Format",
-   "read_only_depends_on": "eval:!doc.enable_pharmacy"
-  },
-  {
    "fieldname": "column_break_zmkf",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cashier_pos_profile",
+   "fieldtype": "Link",
+   "label": "Cashier POS Profile",
+   "options": "POS Profile",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-26 12:44:39.257047",
+ "modified": "2026-09-04 14:19:34.423123",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Clinic Setup",

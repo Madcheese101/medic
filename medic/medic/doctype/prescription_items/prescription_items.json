@@ -30,35 +30,35 @@
   },
   {
    "columns": 1,
+   "default": "1",
    "fieldname": "times",
    "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Times",
-   "reqd": 1
+   "label": "Times"
   },
   {
    "columns": 1,
+   "default": "Day",
    "fieldname": "per",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Per",
-   "options": "Day\nWeek",
-   "reqd": 1
+   "options": "Day\nWeek"
   },
   {
    "columns": 1,
+   "default": "1",
    "fieldname": "for",
    "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "For",
-   "reqd": 1
+   "label": "For"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-23 15:31:51.286884",
+ "modified": "2026-09-16 02:17:19.353659",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Prescription Items",

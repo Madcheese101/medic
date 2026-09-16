@@ -124,6 +124,7 @@
 		method="pay_appointment"
 		:extra-args="{ name: payTarget.name }"
 		:require-full="payTarget.appointment_type === 'كشف'"
+		:modes="cashierModes"
 		@paid="load"
 	/>
 </template>
@@ -141,6 +142,8 @@ const emit = defineEmits(["navigate"]);
 
 const uiStore = useUiStore();
 
+// Cashier POS Profile modes for front-desk collections; null falls back to all modes.
+const cashierModes = frappe.boot.cashier_payment_modes?.length ? frappe.boot.cashier_payment_modes : null;
 const today = frappe.datetime.get_today();
 const rows = ref([]);
 const loading = ref(false);

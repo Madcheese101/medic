@@ -64,8 +64,7 @@
 					variant="tonal"
 					color="primary"
 					prepend-icon="mdi-receipt-text-plus-outline"
-					:loading="creatingInvoice"
-					@click="createInvoice"
+					@click="depositOpen = true"
 				>
 					{{ __("Create Invoice") }}
 				</v-btn>
@@ -148,6 +147,17 @@
 		:extra-args="{ invoice: plan.invoice }"
 		@paid="load"
 	/>
+
+	<SplitPaymentDialog
+		v-model="depositOpen"
+		:title="__('Create Invoice & Collect Deposit')"
+		:outstanding="plan.estimated_total"
+		:currency="plan.currency"
+		method="create_treatment_plan_invoice"
+		:extra-args="{ name: props.name }"
+		:modes="cashierModes"
+		@paid="load"
+	/>
 </template>
 
 <script setup>
@@ -169,10 +179,13 @@ const { isRtl } = useRtl();
 const loading = ref(false);
 const addingSession = ref(false);
 const checkingIn = ref(null);
-const creatingInvoice = ref(false);
 const plan = ref({ sessions: [] });
 const sessionDate = ref(null);
 const payOpen = ref(false);
+const depositOpen = ref(false);
+
+// Cashier POS Profile modes for the deposit; null falls back to all modes.
+const cashierModes = frappe.boot.cashier_payment_modes?.length ? frappe.boot.cashier_payment_modes : null;
 
 const backIcon = computed(() => (isRtl.value ? "mdi-arrow-right" : "mdi-arrow-left"));
 const paidPct = computed(() => (plan.value.paid_pct || 0) * 100);
@@ -199,17 +212,6 @@ async function addSession() {
 		await load();
 	} finally {
 		addingSession.value = false;
-	}
-}
-
-async function createInvoice() {
-	creatingInvoice.value = true;
-	try {
-		await call("create_treatment_plan_invoice", { name: props.name });
-		notifySuccess(__("Invoice created"));
-		await load();
-	} finally {
-		creatingInvoice.value = false;
 	}
 }
 

@@ -390,6 +390,27 @@ def _company_currency():
 	return frappe.db.get_value("Company", company, "default_currency") if company else None
 
 
+def _cashier_profile():
+	"""The Cashier POS Profile that front-desk collections (appointments, plan deposits) post under."""
+	name = frappe.db.get_single_value("Clinic Setup", "cashier_pos_profile")
+	if not name:
+		frappe.throw(_("Set the Cashier POS Profile in Clinic Setup."))
+	return frappe.get_cached_doc("POS Profile", name)
+
+
+def _pos_pay(si, payments):
+	"""Turn a (new or draft) Sales Invoice into a cashier POS invoice paid by `payments`, then submit.
+	The payment lands on the invoice itself, so the cashier's POS Profile owns the collection."""
+	profile = _cashier_profile()
+	si.is_pos = 1
+	si.pos_profile = profile.name
+	for p in payments:
+		si.append("payments", {"mode_of_payment": p["mode_of_payment"], "amount": flt(p["amount"])})
+	si.save()  # inserts when new; persists is_pos/pos_profile/payments on a draft
+	si.submit()
+	return si.name
+
+
 def _ensure_appointment_invoice(pa):
 	"""Return the appointment's Sales Invoice, creating a draft one if missing. Idempotent."""
 	if pa.invoice:
@@ -456,23 +477,25 @@ def pay_appointment(name, payments):
 
 	invoice = _ensure_appointment_invoice(pa)
 	si = frappe.get_doc("Sales Invoice", invoice)
-	if si.docstatus == 0:
-		# Submitting unpaid leaves the status غير مؤكد (the events hook returns early);
-		# the payments below reduce the outstanding, and we flip to مؤكد once it clears.
-		si.submit()
 
 	# A كشف must be settled in full in one go; partial payments are not allowed.
 	if pa.appointment_type == "كشف":
-		current_outstanding = flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))
+		# On a draft the outstanding is not yet posted, so gate against the still-owed amount.
+		owed = flt(si.grand_total) if si.docstatus == 0 else flt(si.outstanding_amount)
 		total_paying = sum(flt(p.get("amount")) for p in payments)
-		if total_paying + 0.01 < current_outstanding:
+		if total_paying + 0.01 < owed:
 			frappe.throw(_("A كشف appointment must be paid in full."))
 
-	for p in payments:
-		add_payment(
-			invoice, p.get("amount"), p.get("mode_of_payment"),
-			p.get("reference_no"), p.get("reference_date"),
-		)
+	if si.docstatus == 0:
+		# Initial payment: capture it inside a cashier POS invoice.
+		_pos_pay(si, payments)
+	else:
+		# Top-up on an already-submitted invoice: record as Payment Entries.
+		for p in payments:
+			add_payment(
+				invoice, p.get("amount"), p.get("mode_of_payment"),
+				p.get("reference_no"), p.get("reference_date"),
+			)
 
 	outstanding = flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))
 	if outstanding <= 0 and pa.appointment_status != "مؤكد":
@@ -717,11 +740,13 @@ def create_treatment_plan(customer, employee, service, total_sessions, notes=Non
 
 
 @frappe.whitelist()
-def create_treatment_plan_invoice(name):
-	"""Create the plan's Sales Invoice on demand; one invoice carries the whole plan."""
+def create_treatment_plan_invoice(name, payments=None):
+	"""Create the plan's Sales Invoice on demand; one invoice carries the whole plan.
+	With `payments`, the initial deposit is collected on a cashier POS invoice."""
 	plan = frappe.get_doc("Treatment Plan", name)
 	if plan.invoice:
 		frappe.throw(_("This plan already has an invoice."))
+	payments = frappe.parse_json(payments) or []
 
 	si = frappe.new_doc("Sales Invoice")
 	si.customer = plan.customer
@@ -729,13 +754,34 @@ def create_treatment_plan_invoice(name):
 	# Custom Link field on Sales Invoice recording which plan this invoice belongs to.
 	si.treatment_plan = plan.name
 	si.append("items", {"item_code": plan.service, "qty": plan.total_sessions})
-	si.insert()
-	si.submit()
+
+	if payments:
+		_pos_pay(si, payments)  # cashier POS invoice carrying the initial deposit
+	else:
+		si.insert()
+		si.submit()
 
 	plan.db_set("invoice", si.name)
 	if plan.status == "Pending":
 		plan.db_set("status", "Active")
 	return si.name
+
+
+def _estimated_total(service, total_sessions):
+	"""Plan price before its invoice exists, so the deposit dialog has a target total.
+	Priced off the cashier POS Profile's price list, falling back to the item's standard rate."""
+	price_list = None
+	profile = frappe.db.get_single_value("Clinic Setup", "cashier_pos_profile")
+	if profile:
+		price_list = frappe.db.get_value("POS Profile", profile, "selling_price_list")
+	rate = None
+	if price_list:
+		rate = frappe.db.get_value(
+			"Item Price", {"item_code": service, "price_list": price_list, "selling": 1}, "price_list_rate"
+		)
+	if not rate:
+		rate = frappe.db.get_value("Item", service, "standard_rate")
+	return flt(rate) * cint(total_sessions)
 
 
 def _plan_dict(plan):
@@ -744,6 +790,8 @@ def _plan_dict(plan):
 	data["customer_name"] = frappe.db.get_value("Customer", data.get("customer"), "customer_name")
 	data["doctor_name"] = frappe.db.get_value("Employee", data.get("employee"), "employee_name")
 	data.update(_invoice_financials(data.get("invoice")))
+	# Target for the "create invoice + deposit" dialog when there is no invoice yet.
+	data["estimated_total"] = data.get("grand_total") or _estimated_total(data.get("service"), data.get("total_sessions"))
 	company = _company()
 	data["currency"] = frappe.db.get_value("Company", company, "default_currency") if company else None
 	return data
@@ -804,6 +852,8 @@ def list_treatment_plans(customer=None, employee=None, status=None, limit=100):
 	).run(as_dict=True)
 	for r in rows:
 		_apply_financials(r)
+		# Deposit target for plans that have no invoice yet.
+		r["estimated_total"] = r.get("grand_total") or _estimated_total(r.get("service"), r.get("total_sessions"))
 	return rows
 
 
@@ -1093,6 +1143,18 @@ def get_sales_invoice(name):
 				"allocated_amount": ref.allocated_amount,
 			}
 		)
+
+	# POS collections are recorded on the invoice itself, not as Payment Entries.
+	for row in si.get("payments") or []:
+		if flt(row.amount) > 0:
+			payments.append(
+				{
+					"posting_date": si.posting_date,
+					"mode_of_payment": row.mode_of_payment,
+					"allocated_amount": flt(row.amount),
+				}
+			)
+
 	data["payments"] = payments
 	return data
 

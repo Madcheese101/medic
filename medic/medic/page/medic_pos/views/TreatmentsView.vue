@@ -63,9 +63,8 @@
 					color="primary"
 					icon="mdi-receipt-text-plus-outline"
 					:title="__('Create Invoice')"
-					:loading="creatingInvoice === item.name"
 					class="mr-1"
-					@click="createInvoice(item.name)"
+					@click="openDeposit(item)"
 				/>
 				<v-btn
 					size="small"
@@ -89,21 +88,37 @@
 	</v-card>
 
 	<NewTreatmentDialog v-model="newOpen" @created="load" />
+
+	<SplitPaymentDialog
+		v-model="depositOpen"
+		:title="__('Create Invoice & Collect Deposit')"
+		:outstanding="depositTarget.estimated_total"
+		:currency="depositTarget.currency"
+		method="create_treatment_plan_invoice"
+		:extra-args="{ name: depositTarget.name }"
+		:modes="cashierModes"
+		@paid="load"
+	/>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { call, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
+import { call, printDoc, searchLinkOptions } from "../client.js";
 import { treatmentStatusColor } from "../constants.js";
 import NewTreatmentDialog from "../components/NewTreatmentDialog.vue";
+import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import { useReferences } from "../references.js";
 
 const refs = useReferences();
 
+// Cashier POS Profile modes for the deposit; null falls back to all modes.
+const cashierModes = frappe.boot.cashier_payment_modes?.length ? frappe.boot.cashier_payment_modes : null;
+
 const rows = ref([]);
 const loading = ref(false);
 const newOpen = ref(false);
-const creatingInvoice = ref(null);
+const depositOpen = ref(false);
+const depositTarget = ref({});
 const customerOptions = ref([]);
 const employeeOptions = ref([]);
 const filters = reactive({ customer: null, employee: null, status: null });
@@ -140,15 +155,9 @@ async function load() {
 	}
 }
 
-async function createInvoice(name) {
-	creatingInvoice.value = name;
-	try {
-		await call("create_treatment_plan_invoice", { name });
-		notifySuccess(__("Invoice created"));
-		await load();
-	} finally {
-		creatingInvoice.value = null;
-	}
+function openDeposit(item) {
+	depositTarget.value = item;
+	depositOpen.value = true;
 }
 
 onMounted(() => {
