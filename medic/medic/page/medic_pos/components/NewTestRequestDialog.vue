@@ -17,6 +17,8 @@
 								prepend-inner-icon="mdi-account-outline"
 								:rules="[required]"
 								item-props
+								append-icon="mdi-account-plus-outline"
+								@click:append="patientOpen = true"
 								@update:search="searchPatients"
 							/>
 						</v-col>
@@ -45,6 +47,7 @@
 					{{ __("Create") }}
 				</v-btn>
 			</v-card-actions>
+			<NewPatientDialog v-model="patientOpen" @created="onPatientCreated" />
 		</v-card>
 	</v-dialog>
 </template>
@@ -53,6 +56,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
 import { call, notifySuccess, searchLinkOptions } from "../client.js";
+import NewPatientDialog from "./NewPatientDialog.vue";
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -70,6 +74,7 @@ const form = ref(null);
 const saving = ref(false);
 const patients = ref([]);
 const tests = ref([]);
+const patientOpen = ref(false);
 
 const blank = () => ({ patient: null, items: [] });
 const model = reactive(blank());
@@ -79,6 +84,12 @@ const nonEmpty = (v) => (Array.isArray(v) && v.length > 0) || __("Add at least o
 
 async function searchPatients(txt) {
 	patients.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
+}
+
+// Select the patient just created, loading its option so the field shows the name.
+async function onPatientCreated(name) {
+	await searchPatients(name);
+	model.patient = name;
 }
 
 async function searchTests(txt) {

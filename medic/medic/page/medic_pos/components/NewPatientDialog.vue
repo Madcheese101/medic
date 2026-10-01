@@ -120,7 +120,7 @@ async function save() {
 		const name = await call("create_patient", { ...model });
 		notifySuccess(__("Patient {0} created", [name]));
 		open.value = false;
-		emit("created");
+		emit("created", name);
 	} finally {
 		saving.value = false;
 	}
