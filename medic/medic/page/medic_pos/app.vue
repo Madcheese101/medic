@@ -154,6 +154,7 @@ const navItems = computed(() => {
 		{ value: "patients", title: "Patients", icon: "mdi-account-injury-outline" },
 		{ value: "appointments", title: "Appointments", icon: "mdi-calendar-check-outline" },
 		{ value: "treatments", title: "Treatments", icon: "mdi-clipboard-pulse-outline" },
+		{ value: "test-requests", title: "Lab Tests", icon: "mdi-test-tube" },
 		{ value: "invoices", title: "Invoices", icon: "mdi-receipt-text-outline" },
 	];
 	// Pharmacy section only when the clinic has pharmacy configured.

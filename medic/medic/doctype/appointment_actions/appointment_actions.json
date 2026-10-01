@@ -24,7 +24,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Invoice Type",
-   "options": "Sales Order\nSales Invoice\nPrescription",
+   "options": "Sales Order\nSales Invoice\nPrescription\nTest Request",
    "read_only": 1
   },
   {

@@ -56,7 +56,7 @@
 						</v-col>
 						<v-col cols="12" md="6">
 							<v-text-field
-								v-model="patient.custom_phone_number"
+								v-model="patient.phone_number"
 								:label="__('Mobile No')"
 								prepend-inner-icon="mdi-phone-outline"
 								:hint="__('e.g. 0912345678')"
@@ -198,7 +198,7 @@ const customer = ref(null);
 const patient = reactive({
 	customer_name: "",
 	date_of_birth: "",
-	custom_phone_number: "",
+	phone_number: "",
 	gender: null,
 	blood_type: null,
 });

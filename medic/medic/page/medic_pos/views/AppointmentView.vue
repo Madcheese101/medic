@@ -1,5 +1,5 @@
 <template>
-	<v-card v-if="!prescribing" :loading="loading">
+	<v-card v-if="!prescribing && !testing" :loading="loading">
 		<v-card-title class="d-flex align-center">
 			<v-btn
 				variant="text"
@@ -176,6 +176,16 @@
 							>
 								{{ __("View") }}
 							</v-btn>
+							<v-btn
+								v-if="row.invoice_type === 'Test Request'"
+								size="small"
+								variant="tonal"
+								color="primary"
+								prepend-icon="mdi-test-tube"
+								@click="viewTestRequest(row)"
+							>
+								{{ __("View") }}
+							</v-btn>
 						</td>
 					</tr>
 					<tr v-if="!doc.actions || !doc.actions.length">
@@ -187,12 +197,22 @@
 	</v-card>
 
 	<PrescriptionForm
-		v-else
+		v-if="prescribing"
 		:appointment="doc.name"
 		:patient="doc.customer_name"
 		:prescription="openPrescription"
 		@saved="closePrescription"
 		@cancel="closePrescription"
+	/>
+
+	<TestRequestForm
+		v-if="testing"
+		:appointment="doc.name"
+		:patient="doc.customer"
+		:patient-name="doc.customer_name"
+		:test-request="openTestRequest"
+		@saved="closeTestRequest"
+		@cancel="closeTestRequest"
 	/>
 
 	<AppointmentActionDialog
@@ -221,6 +241,7 @@ import { call, confirmAction, notifySuccess, printDoc } from "../client.js";
 import { ACTION_TYPES, appointmentStatusColor } from "../constants.js";
 import AppointmentActionDialog from "../components/AppointmentActionDialog.vue";
 import PrescriptionForm from "../components/PrescriptionForm.vue";
+import TestRequestForm from "../components/TestRequestForm.vue";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import ReferenceField from "../components/ReferenceField.vue";
 import { useReferences } from "../references.js";
@@ -241,6 +262,8 @@ const selectedActionType = ref(null);
 const payOpen = ref(false);
 const prescribing = ref(false);
 const openPrescription = ref(null);
+const testing = ref(false);
+const openTestRequest = ref(null);
 const payTarget = ref({});
 const doc = ref({});
 const doctorName = ref("");
@@ -317,6 +340,12 @@ function openAction(actionType) {
 		prescribing.value = true;
 		return;
 	}
+	// Lab actions open an inline Test Request form, mirroring the prescription flow.
+	if (actionType === "تحليل") {
+		openTestRequest.value = null;
+		testing.value = true;
+		return;
+	}
 	selectedActionType.value = actionType;
 	actionOpen.value = true;
 }
@@ -330,6 +359,18 @@ function viewPrescription(row) {
 async function closePrescription() {
 	prescribing.value = false;
 	openPrescription.value = null;
+	await load();
+}
+
+// The row's invoice field carries the Test Request name.
+function viewTestRequest(row) {
+	openTestRequest.value = row.invoice;
+	testing.value = true;
+}
+
+async function closeTestRequest() {
+	testing.value = false;
+	openTestRequest.value = null;
 	await load();
 }
 

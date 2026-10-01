@@ -80,7 +80,7 @@ const headers = computed(() => [
 	{ title: __("File No"), key: "name" },
 	{ title: __("Patient Name"), key: "customer_name" },
 	{ title: __("Date of Birth"), key: "date_of_birth" },
-	{ title: __("Mobile No"), key: "custom_phone_number" },
+	{ title: __("Mobile No"), key: "phone_number" },
 	{ title: __("Gender"), key: "gender" },
 	{ title: __("Blood Type"), key: "blood_type" },
 	{ title: "", key: "actions", sortable: false, align: "end" },

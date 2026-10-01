@@ -21,7 +21,7 @@ def on_customer_before_validate(doc, method=None):
 	"""Store locally-typed phone numbers in E.164 so the Phone field validation accepts them."""
 	import phonenumbers
 
-	number = (doc.custom_phone_number or "").strip()
+	number = (doc.phone_number or "").strip()
 	if not number:
 		return
 
@@ -36,7 +36,7 @@ def on_customer_before_validate(doc, method=None):
 		# Not a phone number at all; let the built-in validation reject what was typed.
 		return
 
-	doc.custom_phone_number = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+	doc.phone_number = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
 
 def on_customer_create(doc, method=None):
 	if not frappe.db.exists("Medical History", {"customer": doc.name}):

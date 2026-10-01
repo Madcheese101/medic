@@ -13,5 +13,6 @@ export function useReferences() {
 		openAppointment: (name) => push("appointment", name),
 		openInvoice: (name) => push("invoice", name),
 		openTreatmentPlan: (name) => push("treatment", name),
+		openTestRequest: (name) => push("test-request", name),
 	};
 }

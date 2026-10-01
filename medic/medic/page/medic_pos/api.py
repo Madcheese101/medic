@@ -4,7 +4,7 @@ from frappe.desk.search import build_for_autosuggest, sanitize_searchfield, sear
 from frappe.query_builder import Order
 from frappe.utils import cint, flt, getdate, today
 
-PATIENT_FIELDS = ("customer_name", "date_of_birth", "custom_phone_number", "gender", "blood_type")
+PATIENT_FIELDS = ("customer_name", "date_of_birth", "phone_number", "gender", "blood_type")
 
 
 def _phone_like(mobile):
@@ -58,7 +58,7 @@ def get_patients(customer_name=None, mobile=None, file_no=None, limit=100):
 	if customer_name:
 		filters["customer_name"] = ["like", f"%{customer_name}%"]
 	if mobile:
-		filters["custom_phone_number"] = _phone_like(mobile)
+		filters["phone_number"] = _phone_like(mobile)
 	if file_no:
 		filters["name"] = ["like", f"%{file_no}%"]
 
@@ -72,14 +72,14 @@ def get_patients(customer_name=None, mobile=None, file_no=None, limit=100):
 
 
 @frappe.whitelist()
-def create_patient(customer_name, date_of_birth, custom_phone_number, gender, blood_type=None):
+def create_patient(customer_name, date_of_birth, phone_number, gender, blood_type=None):
 	doc = frappe.new_doc("Customer")
 	doc.update(
 		{
 			"customer_group": "Individual",
 			"customer_name": customer_name,
 			"date_of_birth": date_of_birth or None,
-			"custom_phone_number": custom_phone_number,
+			"phone_number": phone_number,
 			"gender": gender,
 			"blood_type": blood_type,
 		}
@@ -126,13 +126,13 @@ def get_patient(name):
 
 
 @frappe.whitelist()
-def save_patient(name, customer_name, date_of_birth, custom_phone_number, gender, blood_type=None):
+def save_patient(name, customer_name, date_of_birth, phone_number, gender, blood_type=None):
 	doc = frappe.get_doc("Customer", name)
 	doc.update(
 		{
 			"customer_name": customer_name,
 			"date_of_birth": date_of_birth or None,
-			"custom_phone_number": custom_phone_number,
+			"phone_number": phone_number,
 			"gender": gender,
 			"blood_type": blood_type,
 		}
@@ -378,8 +378,16 @@ def get_appointment(name):
 	# Each action row carries its own invoice's totals so the table/pay dialog have amounts.
 	currency = _company_currency()
 	for row in data.get("actions") or []:
-		# Prescription rows are not billable and carry no Sales Invoice.
-		fin = _invoice_financials(row.get("invoice") if row.get("invoice_type") == "Sales Invoice" else None)
+		# Resolve the row's Sales Invoice: direct for service actions, via the Test Request for
+		# lab actions. Prescription rows are not billable and carry no invoice.
+		invoice = None
+		if row.get("invoice_type") == "Sales Invoice":
+			invoice = row.get("invoice")
+		elif row.get("invoice_type") == "Test Request":
+			invoice = frappe.db.get_value("Test Request", row.get("invoice"), "sales_invoice")
+			# Reflect the linked invoice's payment state on the action row.
+			row["paid"] = 1 if invoice and _invoice_financials(invoice)["outstanding_amount"] <= 0 else 0
+		fin = _invoice_financials(invoice)
 		row["grand_total"] = fin["grand_total"]
 		row["outstanding_amount"] = fin["outstanding_amount"]
 		row["currency"] = currency
@@ -1019,6 +1027,29 @@ def check_in(appointment):
 
 
 @frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def customer_query(doctype, txt, searchfield, start, page_len, filters):
+	"""Customer search that also matches the phone number, which search_widget skips (Phone fieldtype)."""
+	or_filters = None
+	if txt:
+		or_filters = {
+			"name": ["like", f"%{txt}%"],
+			"customer_name": ["like", f"%{txt}%"],
+			"phone_number": _phone_like(txt),
+		}
+
+	return frappe.get_list(
+		"Customer",
+		filters={**(filters or {}), "disabled": 0},
+		or_filters=or_filters,
+		fields=["name", "customer_name", "phone_number"],
+		limit_start=start,
+		limit_page_length=page_len,
+		as_list=True,
+	)
+
+
+@frappe.whitelist()
 def custom_search_link(
 	doctype: str,
 	txt: str,
@@ -1031,6 +1062,9 @@ def custom_search_link(
 	label_fieldname: str | None = None,
 ):
 	"""Link search. With `label_fieldname`, each row also carries that field's value as `label`."""
+	if doctype == "Customer" and not query:
+		query = "medic.medic.page.medic_pos.api.customer_query"
+
 	results = search_widget(
 		doctype,
 		txt.strip(),
@@ -1542,7 +1576,7 @@ def list_prescriptions(customer=None, mobile=None, include_invoiced=0):
 		filters["invoice_created"] = 0
 	if mobile:
 		matches = frappe.get_all(
-			"Customer", filters={"custom_phone_number": _phone_like(mobile)}, pluck="name"
+			"Customer", filters={"phone_number": _phone_like(mobile)}, pluck="name"
 		)
 		filters["patient"] = ["in", matches or [""]]
 
@@ -1552,7 +1586,7 @@ def list_prescriptions(customer=None, mobile=None, include_invoiced=0):
 			"name",
 			"patient",
 			"patient.customer_name as customer_name",
-			"patient.custom_phone_number as mobile",
+			"patient.phone_number as mobile",
 			"posting_date",
 			"invoice_created",
 			"sales_invoice",
@@ -1560,3 +1594,182 @@ def list_prescriptions(customer=None, mobile=None, include_invoiced=0):
 		filters=filters,
 		order_by="creation desc",
 	).run(as_dict=True)
+
+
+# ---------------------------------------------------------------------------
+# Test Requests (Lab)
+# ---------------------------------------------------------------------------
+def _test_request_total(items):
+	"""Sum the price of the given Lab Test item codes (qty 1 each) for the deposit target.
+	Priced off the cashier POS Profile's price list, falling back to the item's standard rate."""
+	price_list = None
+	profile = frappe.db.get_single_value("Clinic Setup", "cashier_pos_profile")
+	if profile:
+		price_list = frappe.db.get_value("POS Profile", profile, "selling_price_list")
+	total = 0.0
+	for code in items:
+		rate = None
+		if price_list:
+			rate = frappe.db.get_value(
+				"Item Price", {"item_code": code, "price_list": price_list, "selling": 1}, "price_list_rate"
+			)
+		if not rate:
+			rate = frappe.db.get_value("Item", code, "standard_rate")
+		total += flt(rate)
+	return total
+
+
+def _test_request_row(tr):
+	"""List/detail dict: patient name, item codes, and the invoice money snapshot."""
+	data = tr.as_dict() if hasattr(tr, "as_dict") else dict(tr)
+	data["patient_name"] = frappe.db.get_value("Customer", data.get("patient"), "customer_name")
+	item_codes = [d.item for d in tr.items]
+	data["item_count"] = len(item_codes)
+	data.update(_invoice_financials(data.get("sales_invoice")))
+	if not data.get("sales_invoice"):
+		data["estimated_total"] = _test_request_total(item_codes)
+	else:
+		data["estimated_total"] = data.get("grand_total")
+	data["currency"] = _company_currency()
+	return data
+
+
+@frappe.whitelist()
+def list_test_requests(customer=None, status=None, limit=100):
+	"""Standalone Lab Tests list, filters applied on the DB."""
+	filters = {"docstatus": 1}
+	if customer:
+		filters["patient"] = customer
+	if status:
+		filters["status"] = status
+
+	names = frappe.get_all(
+		"Test Request", filters=filters, pluck="name", order_by="creation desc", limit=cint(limit)
+	)
+	return [_test_request_row(frappe.get_doc("Test Request", n)) for n in names]
+
+
+@frappe.whitelist()
+def get_test_request(name):
+	tr = frappe.get_doc("Test Request", name)
+	data = _test_request_row(tr)
+	data["items"] = [
+		{"item": d.item, "item_name": frappe.db.get_value("Item", d.item, "item_name")} for d in tr.items
+	]
+	data["result"] = [
+		{"item": r.item, "item_name": frappe.db.get_value("Item", r.item, "item_name"),
+		 "uom": r.uom, "reference_range": r.reference_range, "result": r.result}
+		for r in tr.result
+	]
+	return data
+
+
+@frappe.whitelist()
+def create_test_request(patient, items, appointment=None):
+	"""Standalone Test Request created and submitted by the lab tech. `items`: list of item codes."""
+	items = frappe.parse_json(items) or []
+	items = [i for i in items if i]
+	if not items:
+		frappe.throw(_("Add at least one test."))
+
+	tr = frappe.new_doc("Test Request")
+	tr.posting_date = today()
+	tr.patient = patient
+	tr.appointment = appointment
+	for code in items:
+		tr.append("items", {"item": code})
+	tr.insert()
+	tr.submit()
+	return tr.name
+
+
+@frappe.whitelist()
+def create_test_request_invoice(name, items=None):
+	"""Create a DRAFT Sales Invoice for the chosen items. The cashier sets the payment method
+	and submits it later; submitting seeds the result table (events.on_test_request_invoice_submit)."""
+	tr = frappe.get_doc("Test Request", name)
+	if tr.sales_invoice:
+		existing = frappe.db.get_value("Sales Invoice", tr.sales_invoice, "docstatus")
+		if existing in (0, 1):
+			frappe.throw(_("This request already has an invoice."))
+
+	requested = frappe.parse_json(items) if items else [d.item for d in tr.items]
+	requested = [i for i in requested if i]
+	valid = {d.item for d in tr.items}
+	requested = [i for i in requested if i in valid]
+	if not requested:
+		frappe.throw(_("Select at least one item to invoice."))
+
+	si = frappe.new_doc("Sales Invoice")
+	si.customer = tr.patient
+	si.company = _company()
+	# Separately-collected invoice: the cashier pays and submits it from the invoice view.
+	si.is_action_invoice = 1
+	for code in requested:
+		si.append("items", {"item_code": code, "qty": 1})
+	si.insert()  # draft (docstatus 0)
+
+	# Link now so the on_submit hook that seeds the result table can find this request.
+	tr.db_set("sales_invoice", si.name)
+	return si.name
+
+
+@frappe.whitelist()
+def save_test_results(name, results):
+	"""Lab tech saves result values (partially or fully). Editable only while Ongoing."""
+	results = frappe.parse_json(results) or []
+	by_item = {r.get("item"): r.get("result") for r in results}
+	tr = frappe.get_doc("Test Request", name)
+	for row in tr.result:
+		if row.item in by_item:
+			row.result = by_item[row.item]
+	tr.save()
+	return get_test_request(name)
+
+
+@frappe.whitelist()
+def start_test_request(name):
+	tr = frappe.get_doc("Test Request", name)
+	tr.status = "Ongoing"
+	tr.save()
+	return tr.status
+
+
+@frappe.whitelist()
+def complete_test_request(name):
+	tr = frappe.get_doc("Test Request", name)
+	tr.status = "Completed"
+	tr.save()
+	return tr.status
+
+
+@frappe.whitelist()
+def create_appointment_test_request(appointment, items):
+	"""Test Request for the appointment's patient, recorded as an action row like a prescription."""
+	items = frappe.parse_json(items) or []
+	items = [i for i in items if i]
+	if not items:
+		frappe.throw(_("Add at least one test."))
+
+	pa = frappe.get_doc("Patient Appointment", appointment)
+	if pa.docstatus != 1:
+		frappe.throw(_("Appointment must be submitted."))
+	if pa.appointment_status == "مكتمل":
+		frappe.throw(_("Appointment is already completed."))
+
+	tr = frappe.new_doc("Test Request")
+	tr.posting_date = today()
+	tr.patient = pa.customer
+	tr.appointment = pa.name
+	for code in items:
+		tr.append("items", {"item": code})
+	tr.insert()
+	tr.submit()
+
+	# Billable, so the row starts unpaid; its paid flag tracks the test's invoice.
+	pa.append(
+		"actions",
+		{"invoice": tr.name, "invoice_type": "Test Request", "action_type": "تحليل", "paid": 0},
+	)
+	pa.save()
+	return tr.name

@@ -11,6 +11,8 @@ import ProfileView from "../views/ProfileView.vue";
 import ScheduleView from "../views/ScheduleView.vue";
 import PrescriptionsView from "../views/PrescriptionsView.vue";
 import PosView from "../views/PosView.vue";
+import TestRequestsView from "../views/TestRequestsView.vue";
+import TestRequestView from "../views/TestRequestView.vue";
 
 const ROUTER_STATE_KEYS = ["back", "current", "forward", "position", "replaced", "scroll"];
 
@@ -101,6 +103,16 @@ const routes = [
 		path: "/app/medic-pos/invoice/:name?",
 		name: "invoice",
 		component: InvoiceView,
+	},
+	{
+		path: "/app/medic-pos/tests",
+		name: "test-requests",
+		component: TestRequestsView,
+	},
+	{
+		path: "/app/medic-pos/test/:name?",
+		name: "test-request",
+		component: TestRequestView,
 	},
 	{
 		path: "/app/medic-pos/pharmacy/prescriptions",
