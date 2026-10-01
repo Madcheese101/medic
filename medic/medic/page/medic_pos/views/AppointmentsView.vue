@@ -169,7 +169,7 @@ const headers = computed(() => [
 	{ title: __("Type"), key: "appointment_type" },
 	{ title: __("Patient"), key: "customer_name" },
 	{ title: __("Doctor"), key: "doctor_name" },
-	{ title: __("Service"), key: "service" },
+	{ title: __("Service"), key: "service_name" },
 	{ title: __("Status"), key: "appointment_status" },
 	{ title: __("Queue"), key: "queue", sortable: false },
 	{ title: "", key: "actions", sortable: false, align: "end" },

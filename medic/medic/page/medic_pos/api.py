@@ -312,6 +312,7 @@ APPOINTMENT_LIST_FIELDS = (
 	"employee",
 	"employee.employee_name as doctor_name",
 	"service",
+	"service.item_name as service_name",
 	"appointment_status",
 	"invoice",
 	"treatment_plan",
