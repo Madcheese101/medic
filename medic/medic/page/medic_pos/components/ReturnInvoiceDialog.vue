@@ -280,7 +280,11 @@ async function submit() {
 watch(open, async (isOpen) => {
 	if (!isOpen) return;
 	info.value = null;
-	if (!modes.value.length) modes.value = await call("get_payment_modes");
+	// Refunds are paid out in company currency only.
+	if (!modes.value.length)
+		modes.value = (await call("get_payment_modes")).filter(
+			(m) => !m.currency || m.currency === frappe.boot.sysdefaults.currency
+		);
 	await loadInfo();
 });
 

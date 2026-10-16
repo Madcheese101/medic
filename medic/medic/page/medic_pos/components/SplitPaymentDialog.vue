@@ -23,12 +23,13 @@
 								:label="__('Mode of Payment')"
 								prepend-inner-icon="mdi-credit-card-outline"
 								:rules="[required]"
+								@update:model-value="onModeChange(row)"
 							/>
 							<v-text-field
 								v-model.number="row.amount"
 								type="number"
 								min="0"
-								:label="__('Amount')"
+								:label="rowCurrency(row) ? __('Amount ({0})', [rowCurrency(row)]) : __('Amount')"
 								prepend-inner-icon="mdi-cash"
 								:rules="[required, positive]"
 								style="max-width: 160px"
@@ -42,6 +43,20 @@
 								@click="removeRow(i)"
 							/>
 						</div>
+						<v-row v-if="rowCurrency(row)" dense class="mt-0">
+							<v-col cols="12">
+								<v-text-field
+									v-model.number="row.exchange_rate"
+									type="number"
+									min="0"
+									:label="__('Exchange Rate (1 {0} = ? {1})', [rowCurrency(row), baseCurrency])"
+									prepend-inner-icon="mdi-swap-horizontal"
+									:rules="[required, positive]"
+									:hint="__('Equals {0}', [formatCurrency(rowBase(row), baseCurrency)])"
+									persistent-hint
+								/>
+							</v-col>
+						</v-row>
 						<v-row v-if="needsReference(row)" dense class="mt-0">
 							<v-col cols="12" sm="6">
 								<v-text-field
@@ -122,21 +137,56 @@ const rows = ref([]);
 const required = (v) => (v !== null && v !== "" && v !== undefined) || __("Required");
 const positive = (v) => v > 0 || __("Must be greater than 0");
 
-const total = computed(() => rows.value.reduce((sum, r) => sum + (Number(r.amount) || 0), 0));
+// Totals are kept in company currency; foreign-currency rows are converted at their rate.
+const baseCurrency = computed(() => props.currency || frappe.boot.sysdefaults.currency);
+const total = computed(() => rows.value.reduce((sum, r) => sum + rowBase(r), 0));
 const remaining = computed(() => Number((props.outstanding - total.value).toFixed(2)));
-// Full payment must land exactly on the total; partial just may not exceed it.
-const canPay = computed(() =>
-	props.requireFull ? Math.abs(remaining.value) < 0.01 : total.value > 0 && remaining.value >= -0.01
+// Foreign cash is counted in its own cents, so allow half a foreign cent of overshoot per row.
+const slack = computed(() =>
+	rows.value.reduce((sum, r) => sum + (rowCurrency(r) ? (Number(r.exchange_rate) || 0) * 0.005 : 0), 0.01)
 );
+// Full payment must land on the total; partial just may not exceed it.
+const canPay = computed(() =>
+	props.requireFull
+		? remaining.value < 0.01 && remaining.value >= -slack.value
+		: total.value > 0 && remaining.value >= -slack.value
+);
+
+function modeOf(row) {
+	return modes.value.find((m) => m.name === row.mode_of_payment);
+}
 
 // Reference no/date only apply to non-Cash modes (bank/cheque).
 function needsReference(row) {
-	const mode = modes.value.find((m) => m.name === row.mode_of_payment);
+	const mode = modeOf(row);
 	return !!mode && mode.type !== "Cash";
 }
 
+// The row's currency when it differs from the company's (e.g. a USD cash box), else null.
+function rowCurrency(row) {
+	const currency = modeOf(row)?.currency;
+	return currency && currency !== baseCurrency.value ? currency : null;
+}
+
+function rowBase(row) {
+	const amount = Number(row.amount) || 0;
+	if (!rowCurrency(row)) return amount;
+	return Math.round(amount * (Number(row.exchange_rate) || 0) * 100) / 100;
+}
+
+// A prefilled company-currency amount is meaningless in a foreign currency; let the cashier enter it.
+function onModeChange(row) {
+	if (rowCurrency(row)) row.amount = null;
+}
+
 function blankRow(amount = null) {
-	return { mode_of_payment: null, amount, reference_no: "", reference_date: frappe.datetime.get_today() };
+	return {
+		mode_of_payment: null,
+		amount,
+		exchange_rate: null,
+		reference_no: "",
+		reference_date: frappe.datetime.get_today(),
+	};
 }
 
 function addRow() {
@@ -165,6 +215,7 @@ async function submit() {
 				amount: r.amount,
 				reference_no: r.reference_no || null,
 				reference_date: r.reference_date || null,
+				exchange_rate: rowCurrency(r) ? r.exchange_rate : null,
 			})),
 		});
 		notifySuccess(__("Payment recorded"));

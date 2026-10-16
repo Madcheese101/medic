@@ -24,8 +24,14 @@ def _pos_profile_modes(profile_name):
 	"""The profile's payment modes with their type, shaped like get_payment_modes for the dialogs."""
 	profile = frappe.get_cached_doc("POS Profile", profile_name)
 	modes = []
+	from medic.medic.page.medic_pos.api import mode_currency
+
 	for row in profile.payments:
 		modes.append(
-			{"name": row.mode_of_payment, "type": frappe.db.get_value("Mode of Payment", row.mode_of_payment, "type")}
+			{
+				"name": row.mode_of_payment,
+				"type": frappe.db.get_value("Mode of Payment", row.mode_of_payment, "type"),
+				"currency": mode_currency(row.mode_of_payment, profile.company),
+			}
 		)
 	return modes

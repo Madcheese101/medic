@@ -408,16 +408,61 @@ def _cashier_profile():
 	return frappe.get_cached_doc("POS Profile", name)
 
 
+def _mode_account(mode_of_payment, company=None):
+	return frappe.db.get_value(
+		"Mode of Payment Account",
+		{"parent": mode_of_payment, "company": company or _company()},
+		"default_account",
+	)
+
+
+def mode_currency(mode_of_payment, company=None):
+	"""Currency of the mode's account (e.g. a USD cash box); None when the mode has no account."""
+	from erpnext.accounts.utils import get_account_currency
+
+	account = _mode_account(mode_of_payment, company)
+	return get_account_currency(account) if account else None
+
+
+def _is_foreign(p):
+	currency = mode_currency(p["mode_of_payment"])
+	return bool(currency) and currency != _company_currency()
+
+
+def _base_amount(p):
+	"""A payment row's value in company currency. Foreign rows carry the cashier's rate of the day."""
+	if not _is_foreign(p):
+		return flt(p.get("amount"))
+	if flt(p.get("exchange_rate")) <= 0:
+		frappe.throw(_("Enter the exchange rate for {0}.").format(p["mode_of_payment"]))
+	return flt(flt(p.get("amount")) * flt(p.get("exchange_rate")), 2)
+
+
+def _rounding_slack(payments):
+	"""Foreign cash is counted in its own cents, so its company-currency value may overshoot a
+	little; allow half a foreign cent per foreign row (add_payment absorbs it into the rate)."""
+	return 0.01 + sum(flt(p.get("exchange_rate")) * 0.005 for p in payments if _is_foreign(p))
+
+
 def _pos_pay(si, payments):
 	"""Turn a (new or draft) Sales Invoice into a cashier POS invoice paid by `payments`, then submit.
-	The payment lands on the invoice itself, so the cashier's POS Profile owns the collection."""
-	profile = _cashier_profile()
-	si.is_pos = 1
-	si.pos_profile = profile.name
-	for p in payments:
-		si.append("payments", {"mode_of_payment": p["mode_of_payment"], "amount": flt(p["amount"])})
+	The payment lands on the invoice itself, so the cashier's POS Profile owns the collection.
+	POS payment rows only hold company currency, so foreign-currency rows become Payment Entries."""
+	local = [p for p in payments if not _is_foreign(p)]
+	foreign = [p for p in payments if _is_foreign(p)]
+	if local:
+		profile = _cashier_profile()
+		si.is_pos = 1
+		si.pos_profile = profile.name
+		for p in local:
+			si.append("payments", {"mode_of_payment": p["mode_of_payment"], "amount": flt(p["amount"])})
 	si.save()  # inserts when new; persists is_pos/pos_profile/payments on a draft
 	si.submit()
+	for p in foreign:
+		add_payment(
+			si.name, p.get("amount"), p.get("mode_of_payment"),
+			p.get("reference_no"), p.get("reference_date"), p.get("exchange_rate"),
+		)
 	return si.name
 
 
@@ -479,7 +524,7 @@ def confirm_appointment_invoice(name):
 @frappe.whitelist()
 def pay_appointment(name, payments):
 	"""Submit the appointment's invoice (if draft) and record one or more payments; confirm when
-	fully paid. `payments`: list of {mode_of_payment, amount, reference_no?, reference_date?}."""
+	fully paid. `payments`: list of {mode_of_payment, amount, reference_no?, reference_date?, exchange_rate?}."""
 	payments = frappe.parse_json(payments) or []
 	pa = frappe.get_doc("Patient Appointment", name)
 	if pa.docstatus != 1:
@@ -492,7 +537,7 @@ def pay_appointment(name, payments):
 	if pa.appointment_type == "كشف":
 		# On a draft the outstanding is not yet posted, so gate against the still-owed amount.
 		owed = flt(si.grand_total) if si.docstatus == 0 else flt(si.outstanding_amount)
-		total_paying = sum(flt(p.get("amount")) for p in payments)
+		total_paying = sum(_base_amount(p) for p in payments)
 		if total_paying + 0.01 < owed:
 			frappe.throw(_("A كشف appointment must be paid in full."))
 
@@ -504,7 +549,7 @@ def pay_appointment(name, payments):
 		for p in payments:
 			add_payment(
 				invoice, p.get("amount"), p.get("mode_of_payment"),
-				p.get("reference_no"), p.get("reference_date"),
+				p.get("reference_no"), p.get("reference_date"), p.get("exchange_rate"),
 			)
 
 	outstanding = flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))
@@ -633,22 +678,22 @@ def update_prescription(name, items):
 def pay_appointment_action(invoice, payments):
 	"""Pay an action invoice IN FULL (submit it if draft), split across one or more payment
 	methods, then mark its action row paid. `payments` is a list of
-	{mode_of_payment, amount, reference_no?, reference_date?}."""
+	{mode_of_payment, amount, reference_no?, reference_date?, exchange_rate?}."""
 	payments = frappe.parse_json(payments) or []
 	si = frappe.get_doc("Sales Invoice", invoice)
 	if si.docstatus == 0:
 		si.submit()
 
 	outstanding = flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))
-	total = sum(flt(p.get("amount")) for p in payments)
-	if abs(total - outstanding) > 0.01:
+	total = sum(_base_amount(p) for p in payments)
+	if total + 0.01 < outstanding or total > outstanding + _rounding_slack(payments):
 		frappe.throw(_("Payments must total the full amount ({0}).").format(outstanding))
 
 	# Each method becomes its own Payment Entry allocated to the invoice.
 	for p in payments:
 		add_payment(
 			invoice, p.get("amount"), p.get("mode_of_payment"),
-			p.get("reference_no"), p.get("reference_date"),
+			p.get("reference_no"), p.get("reference_date"), p.get("exchange_rate"),
 		)
 
 	# We submitted it unpaid, so the events hook's fully-paid branch was skipped; flip it here.
@@ -892,24 +937,54 @@ def get_treatment_plan(name):
 
 @frappe.whitelist()
 def get_payment_modes():
-	"""Enabled Modes of Payment with their type, so the dialog knows when to require a reference."""
-	return frappe.get_all(
+	"""Enabled Modes of Payment with their type, so the dialog knows when to require a reference,
+	and their account currency, so it knows when to ask for an exchange rate."""
+	modes = frappe.get_all(
 		"Mode of Payment", filters={"enabled": 1}, fields=["name", "type"], order_by="name"
 	)
+	for m in modes:
+		m["currency"] = mode_currency(m["name"])
+	return modes
 
 
 @frappe.whitelist()
-def add_payment(invoice, amount, mode_of_payment, reference_no=None, reference_date=None):
+def add_payment(invoice, amount, mode_of_payment, reference_no=None, reference_date=None, exchange_rate=None):
+	"""`amount` is in the mode's account currency; a foreign one is converted at `exchange_rate`."""
 	from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
-	pe = get_payment_entry("Sales Invoice", invoice, party_amount=flt(amount))
+	from erpnext.accounts.utils import get_account_currency
+
+	company = frappe.db.get_value("Sales Invoice", invoice, "company")
+	account = _mode_account(mode_of_payment, company)
+	account_currency = get_account_currency(account) if account else None
+	foreign = bool(account_currency) and account_currency != frappe.get_cached_value(
+		"Company", company, "default_currency"
+	)
+
+	amount = flt(amount)
+	party_amount = amount
+	if foreign:
+		rate = flt(exchange_rate)
+		if rate <= 0:
+			frappe.throw(_("Enter the exchange rate for {0}.").format(mode_of_payment))
+		party_amount = flt(amount * rate, 2)
+		# A sub-cent overshoot from rounding the foreign amount is folded into the rate rather
+		# than left on the patient's account as a tiny advance.
+		outstanding = flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))
+		if outstanding < party_amount <= outstanding + rate * 0.005 + 0.01:
+			party_amount = outstanding
+			rate = party_amount / amount
+
+	pe = get_payment_entry("Sales Invoice", invoice, party_amount=party_amount)
 	pe.mode_of_payment = mode_of_payment
 	# get_payment_entry defaults paid_to to the company account, which may be a Bank type and
 	# would then demand a reference. Use the mode's own account so a Cash mode stays Cash.
-	account = frappe.db.get_value(
-		"Mode of Payment Account", {"parent": mode_of_payment, "company": pe.company}, "default_account"
-	)
 	if account:
 		pe.paid_to = account
+	if foreign:
+		# Debtor is credited in company currency; the cash box receives the foreign amount.
+		pe.paid_to_account_currency = account_currency
+		pe.target_exchange_rate = rate
+		pe.received_amount = amount
 	# Bank-type modes require a reference; the dialog collects it for those.
 	if reference_no:
 		pe.reference_no = reference_no
@@ -924,12 +999,12 @@ def add_payment(invoice, amount, mode_of_payment, reference_no=None, reference_d
 @frappe.whitelist()
 def record_payments(invoice, payments):
 	"""Record one or more payments against an already-submitted Sales Invoice (partial allowed).
-	`payments`: list of {mode_of_payment, amount, reference_no?, reference_date?}."""
+	`payments`: list of {mode_of_payment, amount, reference_no?, reference_date?, exchange_rate?}."""
 	payments = frappe.parse_json(payments) or []
 	for p in payments:
 		add_payment(
 			invoice, p.get("amount"), p.get("mode_of_payment"),
-			p.get("reference_no"), p.get("reference_date"),
+			p.get("reference_no"), p.get("reference_date"), p.get("exchange_rate"),
 		)
 	return {"invoice": invoice, "outstanding_amount": flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))}
 
@@ -1291,6 +1366,8 @@ def _add_refund(return_invoice, amount, mode_of_payment, reference_no=None, refe
 
 	# The credit note's outstanding is negative, so the allocation must be negative too;
 	# get_payment_entry still produces a positive `Pay` paid_amount (abs of it).
+	if _is_foreign({"mode_of_payment": mode_of_payment}):
+		frappe.throw(_("Refunds in a foreign currency are not supported."))
 	pe = get_payment_entry("Sales Invoice", return_invoice, party_amount=-flt(amount))
 	pe.mode_of_payment = mode_of_payment
 	# Money leaves the mode's own account (the Pay-side counterpart of add_payment's paid_to).
