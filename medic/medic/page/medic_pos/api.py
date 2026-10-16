@@ -755,7 +755,7 @@ def _treatment_plans_query(filters, order_by_creation=False, limit=None):
 			tp.name, tp.status, tp.customer, cust.customer_name.as_("customer_name"),
 			tp.employee, emp.employee_name.as_("doctor_name"),
 			tp.service, item.item_name.as_("service_name"),
-			tp.total_sessions, tp.completed_sessions, tp.invoice,
+			tp.total_sessions, tp.completed_sessions, tp.invoice, tp.discount_percentage,
 			si.grand_total.as_("grand_total"), si.outstanding_amount.as_("outstanding_amount"),
 		)
 	)
@@ -792,6 +792,66 @@ def _session_gate_ok(plan, is_last):
 	if plan.skip_deposit:
 		return True
 	return fin["paid_pct"] >= DEPOSIT_PCT
+
+
+DISCOUNT_ROLES = ("Doctor", "Cashier")
+
+
+def _validated_discount(discount_percentage):
+	"""Doctors and cashiers may discount up to Clinic Setup's cap; an unset cap allows none."""
+	if not set(DISCOUNT_ROLES) & set(frappe.get_roles()):
+		frappe.throw(_("Only doctors and cashiers can add a discount."), frappe.PermissionError)
+	pct = flt(discount_percentage)
+	max_pct = flt(frappe.db.get_single_value("Clinic Setup", "doctor_max_discount_percentage"))
+	if pct < 0 or pct > max_pct:
+		frappe.throw(_("Discount must be between 0% and {0}%.").format(max_pct))
+	return pct
+
+
+def _apply_discount(si, pct):
+	si.apply_discount_on = "Grand Total"
+	si.additional_discount_percentage = pct
+	# Recomputed from the percentage; reset so clearing the percentage clears the amount too.
+	si.discount_amount = 0
+
+
+NON_DISCOUNTABLE_APPOINTMENT_TYPES = ("كشف", "مراجعة", "متابعة دورية")
+
+
+def _is_non_discountable_invoice(si):
+	"""The appointment's own invoice for a كشف, مراجعة or متابعة دورية (its action invoices are separate services)."""
+	return (
+		bool(si.get("patient_appointment"))
+		and not si.get("is_action_invoice")
+		and frappe.db.get_value("Patient Appointment", si.patient_appointment, "appointment_type")
+		in NON_DISCOUNTABLE_APPOINTMENT_TYPES
+	)
+
+
+@frappe.whitelist()
+def set_invoice_discount(invoice, discount_percentage):
+	"""Discount a draft Sales Invoice. Once submitted, its total is final."""
+	pct = _validated_discount(discount_percentage)
+	si = frappe.get_doc("Sales Invoice", invoice)
+	if si.docstatus != 0:
+		frappe.throw(_("A discount can only be added before the invoice is submitted."))
+	if _is_non_discountable_invoice(si):
+		frappe.throw(_("كشف, مراجعة and متابعة دورية appointments cannot be discounted."))
+	_apply_discount(si, pct)
+	si.save()
+	return {"grand_total": si.grand_total, "discount_percentage": pct}
+
+
+@frappe.whitelist()
+def set_treatment_plan_discount(name, discount_percentage):
+	"""The plan's invoice is submitted as soon as it is created, so its discount is set on the
+	plan beforehand and applied when the invoice is made."""
+	pct = _validated_discount(discount_percentage)
+	plan = frappe.get_doc("Treatment Plan", name)
+	if plan.invoice:
+		frappe.throw(_("A discount can only be added before the plan is invoiced."))
+	plan.db_set("discount_percentage", pct)
+	return pct
 
 
 @frappe.whitelist()
@@ -832,6 +892,8 @@ def create_treatment_plan_invoice(name, payments=None):
 	# Custom Link field on Sales Invoice recording which plan this invoice belongs to.
 	si.treatment_plan = plan.name
 	si.append("items", {"item_code": plan.service, "qty": plan.total_sessions})
+	if flt(plan.discount_percentage):
+		_apply_discount(si, flt(plan.discount_percentage))
 
 	if payments:
 		_pos_pay(si, payments)  # cashier POS invoice carrying the initial deposit
@@ -845,7 +907,22 @@ def create_treatment_plan_invoice(name, payments=None):
 	return si.name
 
 
-def _estimated_total(service, total_sessions):
+@frappe.whitelist()
+def add_treatment_sessions(name, sessions):
+	"""Raise a plan's session count. Once the plan is invoiced the extra sessions are free:
+	the invoice is not touched, so its total is spread over more sessions."""
+	sessions = cint(sessions)
+	if sessions < 1:
+		frappe.throw(_("Sessions to add must be at least 1."))
+	plan = frappe.get_doc("Treatment Plan", name)
+	if plan.docstatus != 1 or plan.status not in ("Pending", "Active"):
+		frappe.throw(_("Sessions can only be added to a pending or active plan."))
+	# total_sessions is not allow-on-submit; db_set bypasses that, as for the other plan counters.
+	plan.db_set("total_sessions", cint(plan.total_sessions) + sessions)
+	return plan.total_sessions
+
+
+def _estimated_total(service, total_sessions, discount_percentage=0):
 	"""Plan price before its invoice exists, so the deposit dialog has a target total.
 	Priced off the cashier POS Profile's price list, falling back to the item's standard rate."""
 	price_list = None
@@ -859,7 +936,7 @@ def _estimated_total(service, total_sessions):
 		)
 	if not rate:
 		rate = frappe.db.get_value("Item", service, "standard_rate")
-	return flt(rate) * cint(total_sessions)
+	return flt(flt(rate) * cint(total_sessions) * (1 - flt(discount_percentage) / 100), 2)
 
 
 def _plan_dict(plan):
@@ -869,7 +946,9 @@ def _plan_dict(plan):
 	data["doctor_name"] = frappe.db.get_value("Employee", data.get("employee"), "employee_name")
 	data.update(_invoice_financials(data.get("invoice")))
 	# Target for the "create invoice + deposit" dialog when there is no invoice yet.
-	data["estimated_total"] = data.get("grand_total") or _estimated_total(data.get("service"), data.get("total_sessions"))
+	data["estimated_total"] = data.get("grand_total") or _estimated_total(
+		data.get("service"), data.get("total_sessions"), data.get("discount_percentage")
+	)
 	company = _company()
 	data["currency"] = frappe.db.get_value("Company", company, "default_currency") if company else None
 	return data
@@ -918,7 +997,9 @@ def list_treatment_plans(customer=None, employee=None, status=None, limit=100):
 	for r in rows:
 		_apply_financials(r)
 		# Deposit target for plans that have no invoice yet.
-		r["estimated_total"] = r.get("grand_total") or _estimated_total(r.get("service"), r.get("total_sessions"))
+		r["estimated_total"] = r.get("grand_total") or _estimated_total(
+			r.get("service"), r.get("total_sessions"), r.get("discount_percentage")
+		)
 	return rows
 
 
@@ -1236,6 +1317,8 @@ def get_sales_invoice(name):
 	# Source references so the details view can link back to its appointment / plan.
 	data["patient_appointment"] = si.get("patient_appointment")
 	data["treatment_plan"] = si.get("treatment_plan")
+	data["discount_percentage"] = flt(si.additional_discount_percentage)
+	data["can_discount"] = si.docstatus == 0 and not _is_non_discountable_invoice(si)
 	data["items"] = [
 		{
 			"item_code": row.item_code,

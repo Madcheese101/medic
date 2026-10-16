@@ -9,6 +9,7 @@
   "cashier_pos_profile",
   "column_break_ibqz",
   "doctors_default_designation",
+  "doctor_max_discount_percentage",
   "section_break_qjdk",
   "enable_pharmacy",
   "pharmacy_item_group",
@@ -98,13 +99,18 @@
    "label": "Cashier POS Profile",
    "options": "POS Profile",
    "reqd": 1
+  },
+  {
+   "fieldname": "doctor_max_discount_percentage",
+   "fieldtype": "Float",
+   "label": "Doctor Max Discount %"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-04 14:19:34.423123",
+ "modified": "2026-10-16 21:46:55.726507",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Clinic Setup",

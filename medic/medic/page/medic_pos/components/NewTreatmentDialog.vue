@@ -33,6 +33,16 @@
 						</v-col>
 						<v-col cols="12" md="6">
 							<v-autocomplete
+								v-model="category"
+								:items="categories"
+								:label="__('Category')"
+								prepend-inner-icon="mdi-shape-outline"
+								clearable
+								@update:model-value="onCategoryChange"
+							/>
+						</v-col>
+						<v-col cols="12" md="6">
+							<v-autocomplete
 								v-model="model.service"
 								:items="services"
 								:label="__('Service')"
@@ -99,6 +109,10 @@ const saving = ref(false);
 const doctors = ref([]);
 const services = ref([]);
 const patients = ref([]);
+// Filters the Service picker only; not saved on the plan.
+const category = ref(null);
+// The parent service group's descendants; the parent itself already bounds every search.
+const categories = (frappe.boot.service_item_groups || []).filter((g) => g !== frappe.boot.parent_service);
 
 const blank = () => ({ customer: null, employee: null, service: null, total_sessions: 1, notes: "" });
 const model = reactive(blank());
@@ -111,6 +125,8 @@ async function searchLink(target, doctype, txt, labelFieldname = null) {
 	// The Doctor picker is always restricted to the clinic's doctor designation.
 	if (target === "doctors" && frappe.boot.default_doctor_designation) {
 		filters = { designation: frappe.boot.default_doctor_designation };
+	} else if (target === "services" && category.value) {
+		filters = { item_group: ["descendants of (inclusive)", category.value] };
 	} else if (target === "services" && frappe.boot.service_item_groups?.length) {
 		// The Service picker is always restricted to the clinic's service item groups.
 		filters = { item_group: ["in", frappe.boot.service_item_groups] };
@@ -119,6 +135,11 @@ async function searchLink(target, doctype, txt, labelFieldname = null) {
 	if (target === "doctors") doctors.value = list;
 	else if (target === "patients") patients.value = list;
 	else services.value = list;
+}
+
+function onCategoryChange() {
+	model.service = null;
+	searchLink("services", "Item", "");
 }
 
 async function save() {
@@ -141,6 +162,7 @@ async function save() {
 watch(open, (isOpen) => {
 	if (!isOpen) return;
 	Object.assign(model, blank());
+	category.value = null;
 	form.value?.resetValidation();
 	searchLink("doctors", "Employee", "");
 	searchLink("services", "Item", "");

@@ -4,6 +4,7 @@ def extend_boot_info(bootinfo):
 	bootinfo["parent_service"] = clinic_settings.service_parent_item_group
 	bootinfo["default_doctor_designation"] = clinic_settings.doctors_default_designation
 	bootinfo["pharmacy_item_group"] = clinic_settings.pharmacy_item_group
+	bootinfo["max_discount_percentage"] = clinic_settings.doctor_max_discount_percentage
 
 	# Cashier POS Profile + its payment modes, so front-desk collections post under it.
 	profile_name = clinic_settings.cashier_pos_profile

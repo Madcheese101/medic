@@ -18,6 +18,14 @@
 				@click="printDoc('Sales Invoice', doc.name)"
 			/>
 			<v-btn
+				v-if="canDiscount"
+				variant="text"
+				icon="mdi-sale-outline"
+				:title="__('Discount')"
+				class="ml-1"
+				@click="discountOpen = true"
+			/>
+			<v-btn
 				v-if="canReturn"
 				variant="text"
 				icon="mdi-cash-refund"
@@ -46,6 +54,9 @@
 				</v-col>
 				<v-col cols="12" md="6">
 					<v-text-field :model-value="formatCurrency(doc.outstanding_amount, doc.currency)" :label="__('Outstanding')" prepend-inner-icon="mdi-cash-clock" readonly />
+				</v-col>
+				<v-col v-if="doc.discount_percentage" cols="12" md="6">
+					<v-text-field :model-value="`${doc.discount_percentage}%`" :label="__('Discount')" prepend-inner-icon="mdi-sale-outline" readonly />
 				</v-col>
 				<v-col v-if="doc.patient_appointment" cols="12" md="6">
 					<ReferenceField :value="doc.patient_appointment" :label="__('Appointment')" icon="mdi-calendar-check-outline" @open="refs.openAppointment(doc.patient_appointment)" />
@@ -118,6 +129,14 @@
 		@paid="load"
 	/>
 
+	<DiscountDialog
+		v-model="discountOpen"
+		:current="doc.discount_percentage"
+		method="set_invoice_discount"
+		:extra-args="{ invoice: doc.name }"
+		@saved="load"
+	/>
+
 	<ReturnInvoiceDialog v-model="returnOpen" :invoice="doc.name" @returned="load" />
 </template>
 
@@ -129,6 +148,7 @@ import { invoiceStatusColor } from "../constants.js";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import ReferenceField from "../components/ReferenceField.vue";
 import ReturnInvoiceDialog from "../components/ReturnInvoiceDialog.vue";
+import DiscountDialog from "../components/DiscountDialog.vue";
 import { useReferences } from "../references.js";
 
 const props = defineProps({ name: { type: String, default: null } });
@@ -140,6 +160,7 @@ const { isRtl } = useRtl();
 const loading = ref(false);
 const payOpen = ref(false);
 const returnOpen = ref(false);
+const discountOpen = ref(false);
 const doc = ref({ items: [], payments: [] });
 
 const backIcon = computed(() => (isRtl.value ? "mdi-arrow-right" : "mdi-arrow-left"));
@@ -150,6 +171,11 @@ const canReturn = computed(() => {
 	if (d.treatment_plan) return true;
 	return !!d.patient_appointment && !d.is_action_invoice && Number(d.outstanding_amount) < Number(d.grand_total);
 });
+
+// Draft invoices other than كشف/مراجعة/متابعة دورية only, for doctors and cashiers; the server re-checks.
+const canDiscount = computed(
+	() => !!doc.value.can_discount && ["Doctor", "Cashier"].some((r) => frappe.user_roles.includes(r))
+);
 
 function formatDate(value) {
 	return value ? frappe.datetime.str_to_user(value) : "";

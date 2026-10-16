@@ -16,6 +16,7 @@
   "invoice",
   "skip_deposit",
   "deposit_waiver_note",
+  "discount_percentage",
   "notes",
   "naming_series",
   "amended_from"
@@ -78,6 +79,13 @@
    "mandatory_depends_on": "eval:doc.skip_deposit"
   },
   {
+   "allow_on_submit": 1,
+   "fieldname": "discount_percentage",
+   "fieldtype": "Percent",
+   "label": "Discount Percentage",
+   "read_only": 1
+  },
+  {
    "fieldname": "notes",
    "fieldtype": "Small Text",
    "label": "Notes"
@@ -112,7 +120,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-02 17:49:25.236052",
+ "modified": "2026-10-17 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Treatment Plan",
