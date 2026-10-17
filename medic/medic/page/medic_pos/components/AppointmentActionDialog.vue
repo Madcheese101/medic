@@ -33,6 +33,19 @@
 								@update:search="(t) => searchServices(t)"
 							/>
 						</v-col>
+						<v-col v-if="showDiscount" cols="12" md="6">
+							<v-text-field
+								v-model.number="model.discount_percentage"
+								type="number"
+								min="0"
+								:max="maxDiscount"
+								:label="__('Discount %')"
+								prepend-inner-icon="mdi-sale-outline"
+								:rules="[discountRule]"
+								:hint="__('Maximum {0}%', [maxDiscount])"
+								persistent-hint
+							/>
+						</v-col>
 					</v-row>
 				</v-form>
 			</v-card-text>
@@ -52,6 +65,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
 import { call, notifySuccess, searchLinkOptions } from "../client.js";
+import { canDiscount, discountRule, maxDiscount } from "../discount.js";
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -70,7 +84,8 @@ const { mobile } = useDisplay();
 const form = ref(null);
 const saving = ref(false);
 const options = reactive({ service_type: [], service: [] });
-const model = reactive({ service_type: null, service: null });
+const model = reactive({ service_type: null, service: null, discount_percentage: null });
+const showDiscount = computed(() => canDiscount() && props.actionType === "علاج");
 
 const required = (value) => !!value || __("Required");
 
@@ -108,6 +123,7 @@ async function save() {
 			name: props.appointment,
 			service: model.service,
 			action_type: props.actionType,
+			discount_percentage: showDiscount.value ? model.discount_percentage : null,
 		});
 		notifySuccess(__("Action created"));
 		open.value = false;
@@ -122,6 +138,7 @@ watch(open, (isOpen) => {
 	if (!isOpen) return;
 	model.service_type = null;
 	model.service = null;
+	model.discount_percentage = null;
 	options.service = [];
 	form.value?.resetValidation();
 	searchServiceTypes("");

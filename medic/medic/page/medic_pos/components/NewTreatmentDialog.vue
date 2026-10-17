@@ -62,6 +62,19 @@
 								:rules="[required, positive]"
 							/>
 						</v-col>
+						<v-col v-if="showDiscount" cols="12" md="6">
+							<v-text-field
+								v-model.number="model.discount_percentage"
+								type="number"
+								min="0"
+								:max="maxDiscount"
+								:label="__('Discount %')"
+								prepend-inner-icon="mdi-sale-outline"
+								:rules="[discountRule]"
+								:hint="__('Maximum {0}%', [maxDiscount])"
+								persistent-hint
+							/>
+						</v-col>
 						<v-col cols="12">
 							<v-textarea
 								v-model="model.notes"
@@ -91,6 +104,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
 import { call, notifySuccess, searchLinkOptions } from "../client.js";
+import { canDiscount, discountRule, maxDiscount } from "../discount.js";
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -114,7 +128,15 @@ const category = ref(null);
 // The parent service group's descendants; the parent itself already bounds every search.
 const categories = (frappe.boot.service_item_groups || []).filter((g) => g !== frappe.boot.parent_service);
 
-const blank = () => ({ customer: null, employee: null, service: null, total_sessions: 1, notes: "" });
+const blank = () => ({
+	customer: null,
+	employee: null,
+	service: null,
+	total_sessions: 1,
+	notes: "",
+	discount_percentage: null,
+});
+const showDiscount = canDiscount();
 const model = reactive(blank());
 
 const required = (v) => !!v || __("Required");

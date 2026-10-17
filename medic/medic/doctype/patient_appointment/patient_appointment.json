@@ -25,6 +25,7 @@
   "invoice",
   "amended_from",
   "session_no",
+  "discount_percentage",
   "section_break_fnna",
   "notes",
   "section_break_wqjo",
@@ -172,13 +173,20 @@
    "fieldtype": "Data",
    "label": "Treatment Plan",
    "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "discount_percentage",
+   "fieldtype": "Percent",
+   "label": "Discount Percentage",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-02 17:18:21.702644",
+ "modified": "2026-10-17 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Patient Appointment",

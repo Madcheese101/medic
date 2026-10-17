@@ -347,9 +347,15 @@ def get_appointments(
 
 @frappe.whitelist()
 def create_appointment(
-	appointment_type, customer, employee, appointment_date, service_type, service, notes=None
+	appointment_type, customer, employee, appointment_date, service_type, service, notes=None,
+	discount_percentage=None,
 ):
 	_validate_appointment_date(employee, appointment_date)
+	pct = 0
+	if flt(discount_percentage):
+		if appointment_type in NON_DISCOUNTABLE_APPOINTMENT_TYPES:
+			frappe.throw(_("{0} appointments cannot be discounted.").format(appointment_type))
+		pct = _validated_discount(discount_percentage)
 	doc = frappe.new_doc("Patient Appointment")
 	doc.update(
 		{
@@ -361,6 +367,8 @@ def create_appointment(
 			"service_type": service_type,
 			"service": service,
 			"notes": notes,
+			# Applied to the invoice, which is only created when the appointment is confirmed.
+			"discount_percentage": pct,
 			# appointment_status is not allow_on_submit, so set it before submitting.
 			"appointment_status": "انتظار",
 		}
@@ -477,6 +485,8 @@ def _ensure_appointment_invoice(pa):
 	# Custom Link field on Sales Invoice; the after_submit event uses it to reach the PA.
 	si.patient_appointment = pa.name
 	si.append("items", {"item_code": pa.service, "qty": 1})
+	if flt(pa.get("discount_percentage")):
+		_apply_discount(si, flt(pa.discount_percentage))
 	si.insert()  # draft (docstatus 0)
 
 	# invoice / appointment_status are read-only on a submitted doc; db_set bypasses that.
@@ -579,7 +589,7 @@ def complete_appointment(name):
 
 
 @frappe.whitelist()
-def create_appointment_action(name, service, action_type):
+def create_appointment_action(name, service, action_type, discount_percentage=None):
 	"""Draft Sales Invoice for an extra service (a different item group than the appointment's),
 	recorded as an action on the appointment and paid separately."""
 	pa = frappe.get_doc("Patient Appointment", name)
@@ -598,6 +608,10 @@ def create_appointment_action(name, service, action_type):
 	si.patient_appointment = pa.name
 	si.is_action_invoice = 1
 	si.append("items", {"item_code": service, "qty": 1})
+	if flt(discount_percentage):
+		if action_type != "علاج":
+			frappe.throw(_("Only علاج actions can be discounted."))
+		_apply_discount(si, _validated_discount(discount_percentage))
 	si.insert()  # draft (docstatus 0)
 
 	pa.append(
@@ -855,10 +869,11 @@ def set_treatment_plan_discount(name, discount_percentage):
 
 
 @frappe.whitelist()
-def create_treatment_plan(customer, employee, service, total_sessions, notes=None):
+def create_treatment_plan(customer, employee, service, total_sessions, notes=None, discount_percentage=None):
 	total_sessions = cint(total_sessions)
 	if total_sessions < 1:
 		frappe.throw(_("Total sessions must be at least 1."))
+	pct = _validated_discount(discount_percentage) if flt(discount_percentage) else 0
 
 	plan = frappe.new_doc("Treatment Plan")
 	plan.update(
@@ -870,6 +885,7 @@ def create_treatment_plan(customer, employee, service, total_sessions, notes=Non
 			"service": service,
 			"total_sessions": total_sessions,
 			"notes": notes,
+			"discount_percentage": pct,
 		}
 	)
 	plan.insert()

@@ -143,6 +143,19 @@
 								@update:search="(t) => searchLink('service', 'Item', t, { item_group: appt.service_type }, 'item_name')"
 							/>
 						</v-col>
+						<v-col v-if="showDiscount" cols="12" md="6">
+							<v-text-field
+								v-model.number="appt.discount_percentage"
+								type="number"
+								min="0"
+								:max="maxDiscount"
+								:label="__('Discount %')"
+								prepend-inner-icon="mdi-sale-outline"
+								:rules="[discountRule]"
+								:hint="__('Maximum {0}%', [maxDiscount])"
+								persistent-hint
+							/>
+						</v-col>
 						<v-col cols="12">
 							<v-textarea
 								v-model="appt.notes"
@@ -179,6 +192,7 @@ import { useRtl } from "vuetify";
 import { call, customSearchLink, notifySuccess, searchLinkOptions } from "../client.js";
 import { APPOINTMENT_TYPES, BLOOD_TYPES } from "../constants.js";
 import DoctorDatePicker from "./DoctorDatePicker.vue";
+import { canDiscount, discountRule, maxDiscount } from "../discount.js";
 
 const props = defineProps({ initialNew: { type: Boolean, default: false } });
 const emit = defineEmits(["created", "cancel"]);
@@ -213,7 +227,10 @@ const appt = reactive({
 	service_type: null,
 	service: null,
 	notes: "",
+	discount_percentage: null,
 });
+// كشف, مراجعة and متابعة دورية are never discounted.
+const showDiscount = computed(() => canDiscount() && appt.appointment_type === "علاج");
 
 const options = reactive({ customer: [], employee: [], service_type: [], service: [] });
 
@@ -268,7 +285,11 @@ async function save() {
 			customerId = await call("create_patient", { ...patient });
 			notifySuccess(__("Patient {0} created", [customerId]));
 		}
-		const name = await call("create_appointment", { ...appt, customer: customerId });
+		const name = await call("create_appointment", {
+			...appt,
+			customer: customerId,
+			discount_percentage: showDiscount.value ? appt.discount_percentage : null,
+		});
 		notifySuccess(__("Appointment {0} created", [name]));
 		emit("created");
 	} finally {
