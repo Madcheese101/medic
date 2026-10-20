@@ -18,7 +18,7 @@ from medic.billing import (
 	validated_discount,
 )
 from medic.constants import ActionType, AppointmentStatus, AppointmentType, label
-from medic.medic.page.medic_pos.api.lists import order_by
+from medic.medic.page.medic_pos.api.lists import date_range, order_by
 
 # ---------------------------------------------------------------- availability
 
@@ -123,7 +123,8 @@ APPOINTMENT_SORTABLE = (
 def get_appointments(
 	customer=None,
 	employee=None,
-	appointment_date=None,
+	from_date=None,
+	to_date=None,
 	appointment_status=None,
 	start=0,
 	page_length=20,
@@ -136,8 +137,8 @@ def get_appointments(
 		filters["customer"] = customer
 	if employee:
 		filters["employee"] = employee
-	if appointment_date:
-		filters["appointment_date"] = appointment_date
+	if dates := date_range(from_date, to_date):
+		filters["appointment_date"] = dates
 	if appointment_status:
 		filters["appointment_status"] = appointment_status
 
@@ -282,7 +283,8 @@ def pay_appointment(name, payments):
 
 	outstanding = flt(frappe.db.get_value("Sales Invoice", invoice, "outstanding_amount"))
 	if outstanding <= 0 and pa.appointment_status != AppointmentStatus.CONFIRMED:
-		pa.db_set("appointment_status", AppointmentStatus.CONFIRMED)
+		# notify: open appointment lists refresh once this commits.
+		pa.db_set("appointment_status", AppointmentStatus.CONFIRMED, notify=True)
 	return {
 		"invoice": invoice,
 		"outstanding_amount": outstanding,

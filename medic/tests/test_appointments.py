@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import flt
+from frappe.utils import add_days, flt, today
 
 from medic.constants import ActionType, AppointmentStatus, AppointmentType
 from medic.tests.utils import MedicTestCase, appointment_status, call
@@ -131,6 +131,26 @@ class TestAppointmentPayments(MedicTestCase):
 
 
 class TestLists(MedicTestCase):
+	def test_appointments_page_and_filter_by_date_range(self):
+		patient = self.make_patient()
+		names = {self.make_appointment(patient=patient) for _ in range(3)}
+
+		first = call(
+			"appointments.get_appointments",
+			customer=patient,
+			from_date=today(),
+			to_date=today(),
+			page_length=2,
+		)
+		self.assertEqual(first["total"], 3)
+		self.assertEqual(len(first["rows"]), 2)
+		rest = call("appointments.get_appointments", customer=patient, start=2, page_length=2)
+		self.assertEqual({r["name"] for r in first["rows"] + rest["rows"]}, names)
+
+		tomorrow = add_days(today(), 1)
+		listed = call("appointments.get_appointments", customer=patient, from_date=tomorrow, to_date=tomorrow)
+		self.assertEqual(listed, {"rows": [], "total": 0})
+
 	def test_lists_sort_only_on_their_own_columns(self):
 		patient = self.make_patient()
 		older = self.make_appointment(patient=patient)

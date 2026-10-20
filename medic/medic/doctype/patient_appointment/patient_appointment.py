@@ -27,7 +27,8 @@ class PatientAppointment(Document):
 		si.insert()  # draft (docstatus 0)
 
 		# invoice / appointment_status are read-only on a submitted doc; db_set bypasses that.
-		self.db_set("invoice", si.name)
+		# notify: open appointment lists refresh once this commits, status change included.
+		self.db_set("invoice", si.name, notify=True)
 		if self.appointment_status == AppointmentStatus.PENDING:
 			self.db_set("appointment_status", AppointmentStatus.UNCONFIRMED)
 		return si.name
@@ -56,7 +57,8 @@ class PatientAppointment(Document):
 		elif self.appointment_status != AppointmentStatus.CONFIRMED:
 			frappe.throw(_("Appointment must be paid before check-in."))
 
-		self.db_set("queue", self._next_queue())
+		# notify: the doctor's open queue refreshes once this commits, status change included.
+		self.db_set("queue", self._next_queue(), notify=True)
 		# Queuing a session means its gate passed; reflect that on the appointment.
 		# The session only counts toward the plan once the doctor completes it.
 		if self.treatment_plan and self.appointment_status != AppointmentStatus.CONFIRMED:
@@ -73,7 +75,7 @@ class PatientAppointment(Document):
 		if self.treatment_plan and self.appointment_status != AppointmentStatus.COMPLETED:
 			plan = frappe.get_doc("Treatment Plan", self.treatment_plan)
 			plan.db_set("completed_sessions", cint(plan.completed_sessions) + 1)
-		self.db_set("appointment_status", AppointmentStatus.COMPLETED)
+		self.db_set("appointment_status", AppointmentStatus.COMPLETED, notify=True)
 
 	def _next_queue(self):
 		taken = frappe.get_all(

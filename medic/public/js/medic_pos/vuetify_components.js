@@ -15,6 +15,7 @@ export {
 	VCardTitle,
 	VCheckbox,
 	VChip,
+	VChipGroup,
 	VCol,
 	VContainer,
 	VDataTable,

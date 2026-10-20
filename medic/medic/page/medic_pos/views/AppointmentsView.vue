@@ -29,8 +29,13 @@
 				:label="__('Date')"
 				clearable
 				style="max-width: 190px"
-				@update:model-value="table.reload"
+				@update:model-value="onDate"
 			/>
+			<v-chip-group v-model="period" selected-class="text-primary" @update:model-value="onPeriod">
+				<v-chip value="today" variant="outlined" filter>{{ __("Today") }}</v-chip>
+				<v-chip value="tomorrow" variant="outlined" filter>{{ __("Tomorrow") }}</v-chip>
+				<v-chip value="week" variant="outlined" filter>{{ __("This Week") }}</v-chip>
+			</v-chip-group>
 			<v-select
 				v-model="filters.appointment_status"
 				:items="APPOINTMENT_STATUS"
@@ -136,7 +141,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { call, debounce, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
 import {
 	APPOINTMENT_STATUS,
@@ -167,6 +172,8 @@ const payOpen = ref(false);
 const payTarget = ref({});
 const customerOptions = ref([]);
 const employeeOptions = ref([]);
+// A quick period chip, or null when a specific date (or no date at all) is chosen instead.
+const period = ref("today");
 const filters = reactive({
 	customer: null,
 	employee: null,
@@ -174,7 +181,16 @@ const filters = reactive({
 	appointment_status: null,
 });
 
-const table = useServerTable("appointments.get_appointments", () => filters);
+const table = useServerTable("appointments.get_appointments", () => {
+	const [from_date, to_date] = dateRange();
+	return {
+		customer: filters.customer,
+		employee: filters.employee,
+		appointment_status: filters.appointment_status,
+		from_date,
+		to_date,
+	};
+});
 
 // The doctor and service names are joined in on the server, which can't sort on them.
 const headers = computed(() => [
@@ -191,6 +207,42 @@ const headers = computed(() => [
 
 function formatDate(value) {
 	return value ? frappe.datetime.str_to_user(value) : "";
+}
+
+// frappe.datetime.add_days formats in the user's locale, which can turn the digits Arabic;
+// obj_to_str always formats in English, as the server expects.
+function addDays(date, days) {
+	const d = frappe.datetime.str_to_obj(date);
+	d.setDate(d.getDate() + days);
+	return frappe.datetime.obj_to_str(d);
+}
+
+// [from, to] for the chosen date or period chip; [null, null] shows every date.
+function dateRange() {
+	if (filters.appointment_date) return [filters.appointment_date, filters.appointment_date];
+	if (period.value === "today") return [today, today];
+	if (period.value === "tomorrow") {
+		const tomorrow = addDays(today, 1);
+		return [tomorrow, tomorrow];
+	}
+	if (period.value === "week") {
+		// The week starts on the first day set in System Settings.
+		const firstDay = frappe.datetime.get_first_day_of_the_week_index();
+		const start = addDays(today, -((frappe.datetime.str_to_obj(today).getDay() - firstDay + 7) % 7));
+		return [start, addDays(start, 6)];
+	}
+	return [null, null];
+}
+
+// A chip and a specific date are alternatives: picking one clears the other.
+function onPeriod() {
+	filters.appointment_date = "";
+	table.reload();
+}
+
+function onDate(value) {
+	if (value) period.value = null;
+	table.reload();
 }
 
 const searchCustomers = debounce(async (txt) => {
@@ -253,8 +305,24 @@ async function checkIn(name) {
 	}
 }
 
+// Live refresh: the server announces every appointment change (booking, payment, check-in,
+// completion) to users who can read appointments, so the doctor's queue follows reception.
+const reloadSoon = debounce(() => table.load(), 500);
+
+function onListUpdate(data) {
+	if (data?.doctype === "Patient Appointment" && !creating.value) reloadSoon();
+}
+
 onMounted(() => {
 	searchCustomers("");
 	searchEmployees("");
+	frappe.realtime.doctype_subscribe("Patient Appointment");
+	frappe.realtime.on("list_update", onListUpdate);
+});
+
+onUnmounted(() => {
+	reloadSoon.cancel();
+	frappe.realtime.off("list_update", onListUpdate);
+	frappe.realtime.doctype_unsubscribe("Patient Appointment");
 });
 </script>
