@@ -3,8 +3,7 @@ frappe.provide("frappe.MedicPos");
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import { createVuetify } from "vuetify";
-import * as components from "vuetify/components";
-import * as directives from "vuetify/directives";
+import * as components from "./vuetify_components.js";
 import { ar, en } from "vuetify/locale";
 import App from "../../../medic/page/medic_pos/app.vue";
 import router from "../../../medic/page/medic_pos/router/index.js";
@@ -43,7 +42,6 @@ frappe.MedicPos.Controller = class {
 
 		const vuetify = createVuetify({
 			components,
-			directives,
 			locale: {
 				locale: lang,
 				fallback: "en",
