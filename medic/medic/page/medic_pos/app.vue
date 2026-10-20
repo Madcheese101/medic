@@ -77,7 +77,7 @@
 				<v-list density="comfortable" min-width="220">
 					<v-list-item
 						prepend-icon="mdi-account-plus-outline"
-						:title="__('Create Direct appointment')"
+						:title="__('New patient + appointment')"
 						@click="createAppointment(true)"
 					/>
 					<v-list-item
