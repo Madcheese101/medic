@@ -53,32 +53,32 @@
 		<v-card-text>
 			<div class="text-subtitle-2 text-medium-emphasis mb-2">{{ __("Appointment Details") }}</div>
 			<v-row dense>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="label(doc.appointment_type, 'Patient Appointment')" :label="__('Appointment Type')" prepend-inner-icon="mdi-clipboard-text-outline" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="label(doc.appointment_type, 'Patient Appointment')" :label="__('Appointment Type')" icon="mdi-clipboard-text-outline" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="formatDate(doc.appointment_date)" :label="__('Appointment Date')" prepend-inner-icon="mdi-calendar" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="formatDate(doc.appointment_date)" :label="__('Appointment Date')" icon="mdi-calendar" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="doc.customer_name" :label="__('Patient')" prepend-inner-icon="mdi-account-outline" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="doc.customer_name" :label="__('Patient')" icon="mdi-account-outline" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="doctorName" :label="__('Doctor')" prepend-inner-icon="mdi-doctor" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="doctorName" :label="__('Doctor')" icon="mdi-doctor" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="doc.service_type" :label="__('Service Type')" prepend-inner-icon="mdi-shape-outline" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="doc.service_type" :label="__('Service Type')" icon="mdi-shape-outline" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="doc.service_name || doc.service" :label="__('Service')" prepend-inner-icon="mdi-medical-bag" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="doc.service_name || doc.service" :label="__('Service')" icon="mdi-medical-bag" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<ReferenceField :value="doc.invoice" :label="__('Invoice')" icon="mdi-receipt-text-outline" @open="refs.openInvoice(doc.invoice)" />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="doc.invoice" :label="__('Invoice')" icon="mdi-receipt-text-outline" link @open="refs.openInvoice(doc.invoice)" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="doc.queue" :label="__('Queue')" prepend-inner-icon="mdi-counter" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="doc.queue" :label="__('Queue')" icon="mdi-counter" />
 				</v-col>
-				<v-col v-if="doc.treatment_plan" cols="12" md="6">
-					<ReferenceField :value="doc.treatment_plan" :label="__('Treatment Plan')" icon="mdi-clipboard-pulse-outline" @open="refs.openTreatmentPlan(doc.treatment_plan)" />
+				<v-col v-if="doc.treatment_plan" cols="12" sm="6" md="4">
+					<InfoField :value="doc.treatment_plan" :label="__('Treatment Plan')" icon="mdi-clipboard-pulse-outline" link @open="refs.openTreatmentPlan(doc.treatment_plan)" />
 				</v-col>
 			</v-row>
 
@@ -143,15 +143,20 @@
 						<th>{{ __("Invoice") }}</th>
 						<th>{{ __("Invoice Type") }}</th>
 						<th>{{ __("Action Type") }}</th>
+						<th class="text-end">{{ __("Total") }}</th>
+						<th class="text-end">{{ __("Outstanding") }}</th>
 						<th>{{ __("Paid") }}</th>
 						<th />
 					</tr>
 				</thead>
 				<tbody>
 					<tr v-for="(row, i) in doc.actions" :key="i">
-						<td>{{ row.invoice }}</td>
+						<td><a class="medic-ref-link" @click="openActionRecord(row)">{{ row.invoice }}</a></td>
 						<td>{{ row.invoice_type }}</td>
 						<td>{{ label(row.action_type, "Appointment Actions") }}</td>
+						<!-- Amounts come from the row's Sales Invoice; prescriptions and uninvoiced tests have none. -->
+						<td class="text-end">{{ row.sales_invoice ? formatCurrency(row.grand_total, row.currency) : "—" }}</td>
+						<td class="text-end">{{ row.sales_invoice ? formatCurrency(row.outstanding_amount, row.currency) : "—" }}</td>
 						<td>
 							<v-icon :icon="row.paid ? 'mdi-check-circle' : 'mdi-close-circle-outline'" :color="row.paid ? 'success' : 'medium-emphasis'" />
 						</td>
@@ -189,7 +194,7 @@
 						</td>
 					</tr>
 					<tr v-if="!doc.actions || !doc.actions.length">
-						<td colspan="5" class="text-medium-emphasis">{{ __("No actions yet") }}</td>
+						<td colspan="7" class="text-medium-emphasis">{{ __("No actions yet") }}</td>
 					</tr>
 				</tbody>
 			</v-table>
@@ -237,7 +242,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRtl } from "vuetify";
-import { call, confirmAction, notifySuccess, printDoc } from "../client.js";
+import { call, confirmAction, formatCurrency, notifySuccess, printDoc } from "../client.js";
 import {
 	ACTION_TYPES,
 	ActionType,
@@ -249,7 +254,7 @@ import AppointmentActionDialog from "../components/AppointmentActionDialog.vue";
 import PrescriptionForm from "../components/PrescriptionForm.vue";
 import TestRequestForm from "../components/TestRequestForm.vue";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
-import ReferenceField from "../components/ReferenceField.vue";
+import InfoField from "../components/InfoField.vue";
 import { useReferences } from "../references.js";
 
 const refs = useReferences();
@@ -378,6 +383,13 @@ async function closeTestRequest() {
 	testing.value = false;
 	openTestRequest.value = null;
 	await load();
+}
+
+// An action row's id opens its own record: the invoice, the test request or the prescription.
+function openActionRecord(row) {
+	if (row.invoice_type === "Test Request") viewTestRequest(row);
+	else if (row.invoice_type === "Prescription") viewPrescription(row);
+	else refs.openInvoice(row.invoice);
 }
 
 // Treatment actions are paid in full; the row carries its invoice totals from get_appointment.

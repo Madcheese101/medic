@@ -45,6 +45,7 @@ class TestLabTests(MedicTestCase):
 		)
 		self.assertEqual(row["invoice_type"], "Test Request")
 		self.assertEqual(row["paid"], 0)
+		self.assertIsNone(row["sales_invoice"])
 
 		invoice = call("lab.create_test_request_invoice", name=name)
 		call("appointments.pay_appointment_action", invoice=invoice, payments=[self.cash(50)])
@@ -54,6 +55,9 @@ class TestLabTests(MedicTestCase):
 			if r["invoice"] == name
 		)
 		self.assertEqual(row["paid"], 1)
+		# The row resolves the test's invoice, so the appointment can show its amounts.
+		self.assertEqual(row["sales_invoice"], invoice)
+		self.assertEqual(row["grand_total"], 50)
 
 
 class TestPharmacy(MedicTestCase):

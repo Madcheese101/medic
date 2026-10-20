@@ -43,26 +43,26 @@
 		<v-card-text>
 			<div class="text-subtitle-2 text-medium-emphasis mb-2">{{ __("Invoice Details") }}</div>
 			<v-row dense>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="doc.customer_name || doc.customer" :label="__('Patient')" prepend-inner-icon="mdi-account-outline" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="doc.customer_name || doc.customer" :label="__('Patient')" icon="mdi-account-outline" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="formatDate(doc.posting_date)" :label="__('Date')" prepend-inner-icon="mdi-calendar" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="formatDate(doc.posting_date)" :label="__('Date')" icon="mdi-calendar" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="formatCurrency(doc.grand_total, doc.currency)" :label="__('Total')" prepend-inner-icon="mdi-cash" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="formatCurrency(doc.grand_total, doc.currency)" :label="__('Total')" icon="mdi-cash" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="formatCurrency(doc.outstanding_amount, doc.currency)" :label="__('Outstanding')" prepend-inner-icon="mdi-cash-clock" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="formatCurrency(doc.outstanding_amount, doc.currency)" :label="__('Outstanding')" icon="mdi-cash-clock" />
 				</v-col>
-				<v-col v-if="doc.discount_percentage" cols="12" md="6">
-					<v-text-field :model-value="`${doc.discount_percentage}%`" :label="__('Discount')" prepend-inner-icon="mdi-sale-outline" readonly />
+				<v-col v-if="doc.discount_percentage" cols="12" sm="6" md="4">
+					<InfoField :value="`${doc.discount_percentage}%`" :label="__('Discount')" icon="mdi-sale-outline" />
 				</v-col>
-				<v-col v-if="doc.patient_appointment" cols="12" md="6">
-					<ReferenceField :value="doc.patient_appointment" :label="__('Appointment')" icon="mdi-calendar-check-outline" @open="refs.openAppointment(doc.patient_appointment)" />
+				<v-col v-if="doc.patient_appointment" cols="12" sm="6" md="4">
+					<InfoField :value="doc.patient_appointment" :label="__('Appointment')" icon="mdi-calendar-check-outline" link @open="refs.openAppointment(doc.patient_appointment)" />
 				</v-col>
-				<v-col v-if="doc.treatment_plan" cols="12" md="6">
-					<ReferenceField :value="doc.treatment_plan" :label="__('Treatment Plan')" icon="mdi-clipboard-pulse-outline" @open="refs.openTreatmentPlan(doc.treatment_plan)" />
+				<v-col v-if="doc.treatment_plan" cols="12" sm="6" md="4">
+					<InfoField :value="doc.treatment_plan" :label="__('Treatment Plan')" icon="mdi-clipboard-pulse-outline" link @open="refs.openTreatmentPlan(doc.treatment_plan)" />
 				</v-col>
 			</v-row>
 
@@ -146,7 +146,7 @@ import { useRtl } from "vuetify";
 import { call, formatCurrency, printDoc } from "../client.js";
 import { invoiceStatusColor } from "../constants.js";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
-import ReferenceField from "../components/ReferenceField.vue";
+import InfoField from "../components/InfoField.vue";
 import ReturnInvoiceDialog from "../components/ReturnInvoiceDialog.vue";
 import DiscountDialog from "../components/DiscountDialog.vue";
 import { useReferences } from "../references.js";

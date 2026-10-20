@@ -214,6 +214,7 @@ def get_appointment(name):
 			invoice = frappe.db.get_value("Test Request", row.get("invoice"), "sales_invoice")
 			# Reflect the linked invoice's payment state on the action row.
 			row["paid"] = 1 if invoice and invoice_financials(invoice)["outstanding_amount"] <= 0 else 0
+		row["sales_invoice"] = invoice
 		fin = invoice_financials(invoice)
 		row["grand_total"] = fin["grand_total"]
 		row["outstanding_amount"] = fin["outstanding_amount"]

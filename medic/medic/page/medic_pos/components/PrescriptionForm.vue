@@ -27,14 +27,14 @@
 
 		<v-card-text>
 			<v-row dense>
-				<v-col cols="12" md="4">
-					<v-text-field :model-value="patient" :label="__('Patient')" prepend-inner-icon="mdi-account-outline" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="patient" :label="__('Patient')" icon="mdi-account-outline" />
 				</v-col>
-				<v-col cols="12" md="4">
-					<v-text-field :model-value="appointment" :label="__('Appointment')" prepend-inner-icon="mdi-calendar-check-outline" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="appointment" :label="__('Appointment')" icon="mdi-calendar-check-outline" />
 				</v-col>
-				<v-col cols="12" md="4">
-					<v-text-field :model-value="formatDate(postingDate)" :label="__('Posting Date')" prepend-inner-icon="mdi-calendar" readonly />
+				<v-col cols="12" sm="6" md="4">
+					<InfoField :value="formatDate(postingDate)" :label="__('Posting Date')" icon="mdi-calendar" />
 				</v-col>
 			</v-row>
 
@@ -161,6 +161,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useDisplay, useRtl } from "vuetify";
 import { call, debounce, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
 import { PRESCRIPTION_PER, PRESCRIPTION_ROUTES } from "../constants.js";
+import InfoField from "./InfoField.vue";
 
 const props = defineProps({
 	appointment: { type: String, default: null },

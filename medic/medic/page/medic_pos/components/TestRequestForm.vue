@@ -47,15 +47,17 @@
 
 		<v-card-text>
 			<v-row dense>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="patientName" :label="__('Patient')" prepend-inner-icon="mdi-account-outline" readonly />
+				<v-col cols="12" sm="6">
+					<InfoField :value="patientName" :label="__('Patient')" icon="mdi-account-outline" />
 				</v-col>
-				<v-col v-if="!isNew" cols="12" md="6">
-					<v-text-field :label="__('Invoice')" readonly :model-value="doc.sales_invoice || __('Not invoiced')" prepend-inner-icon="mdi-receipt-text-outline">
-						<template v-if="doc.sales_invoice" #append-inner>
-							<a class="medic-ref-link" @click="refs.openInvoice(doc.sales_invoice)">{{ __("Open") }}</a>
-						</template>
-					</v-text-field>
+				<v-col v-if="!isNew" cols="12" sm="6">
+					<InfoField
+						:value="doc.sales_invoice || __('Not invoiced')"
+						:label="__('Invoice')"
+						icon="mdi-receipt-text-outline"
+						:link="!!doc.sales_invoice"
+						@open="refs.openInvoice(doc.sales_invoice)"
+					/>
 				</v-col>
 			</v-row>
 
@@ -149,6 +151,7 @@ import { useRtl } from "vuetify";
 import { call, confirmAction, debounce, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
 import { testRequestStatusColor } from "../constants.js";
 import TestRequestInvoiceDialog from "./TestRequestInvoiceDialog.vue";
+import InfoField from "./InfoField.vue";
 import { useReferences } from "../references.js";
 
 const props = defineProps({

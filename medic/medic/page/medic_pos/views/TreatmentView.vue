@@ -27,17 +27,17 @@
 		<v-card-text>
 			<div class="text-subtitle-2 text-medium-emphasis mb-2">{{ __("Treatment Details") }}</div>
 			<v-row dense>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="plan.customer_name" :label="__('Patient')" prepend-inner-icon="mdi-account-outline" readonly />
+				<v-col cols="12" sm="6" md="3">
+					<InfoField :value="plan.customer_name" :label="__('Patient')" icon="mdi-account-outline" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="plan.doctor_name || plan.employee" :label="__('Doctor')" prepend-inner-icon="mdi-doctor" readonly />
+				<v-col cols="12" sm="6" md="3">
+					<InfoField :value="plan.doctor_name || plan.employee" :label="__('Doctor')" icon="mdi-doctor" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<v-text-field :model-value="plan.service_name || plan.service" :label="__('Service')" prepend-inner-icon="mdi-medical-bag" readonly />
+				<v-col cols="12" sm="6" md="3">
+					<InfoField :value="plan.service_name || plan.service" :label="__('Service')" icon="mdi-medical-bag" />
 				</v-col>
-				<v-col cols="12" md="6">
-					<ReferenceField :value="plan.invoice" :label="__('Invoice')" icon="mdi-receipt-text-outline" @open="refs.openInvoice(plan.invoice)" />
+				<v-col cols="12" sm="6" md="3">
+					<InfoField :value="plan.invoice" :label="__('Invoice')" icon="mdi-receipt-text-outline" link @open="refs.openInvoice(plan.invoice)" />
 				</v-col>
 			</v-row>
 
@@ -231,7 +231,7 @@ import { appointmentStatusColor, label, treatmentStatusColor } from "../constant
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import DoctorDatePicker from "../components/DoctorDatePicker.vue";
 import DiscountDialog from "../components/DiscountDialog.vue";
-import ReferenceField from "../components/ReferenceField.vue";
+import InfoField from "../components/InfoField.vue";
 import { useReferences } from "../references.js";
 import { hasDiscountRole } from "../discount.js";
 
