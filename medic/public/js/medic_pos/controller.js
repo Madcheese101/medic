@@ -75,6 +75,8 @@ frappe.MedicPos.Controller = class {
 				},
 				VList: { rounded: "lg" },
 				VDataTable: { hover: true },
+				// No "All" page size: it would ask the server for every row.
+				VDataTableServer: { hover: true, itemsPerPageOptions: [10, 25, 50, 100] },
 			},
 		});
 

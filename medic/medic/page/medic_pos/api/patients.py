@@ -1,9 +1,10 @@
 """Patients (ERPNext Customers) and their Medical History."""
 
 import frappe
-from frappe.utils import today
+from frappe.utils import cint, today
 
 from medic.billing import company
+from medic.medic.page.medic_pos.api.lists import order_by
 
 PATIENT_FIELDS = ("customer_name", "date_of_birth", "phone_number", "gender", "blood_type")
 
@@ -14,8 +15,10 @@ def phone_like(mobile):
 
 
 @frappe.whitelist()
-def get_patients(customer_name=None, mobile=None, file_no=None, limit=100):
-	"""Patient list with the filters applied on the DB, not in the browser."""
+def get_patients(
+	customer_name=None, mobile=None, file_no=None, start=0, page_length=20, sort_by=None, sort_order=None
+):
+	"""One page of the patient list, with the filters applied on the DB, not in the browser."""
 	filters = {}
 	if customer_name:
 		filters["customer_name"] = ["like", f"%{customer_name}%"]
@@ -24,13 +27,15 @@ def get_patients(customer_name=None, mobile=None, file_no=None, limit=100):
 	if file_no:
 		filters["name"] = ["like", f"%{file_no}%"]
 
-	return frappe.qb.get_query(
+	rows = frappe.qb.get_query(
 		"Customer",
 		fields=["name", *PATIENT_FIELDS],
 		filters=filters,
-		order_by="creation desc",
-		limit=limit,
+		order_by=order_by(sort_by, sort_order, ("name", *PATIENT_FIELDS), "creation desc"),
+		limit=cint(page_length),
+		offset=cint(start),
 	).run(as_dict=True)
+	return {"rows": rows, "total": frappe.db.count("Customer", filters)}
 
 
 @frappe.whitelist()

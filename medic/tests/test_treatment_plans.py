@@ -12,7 +12,7 @@ class TestTreatmentPlans(MedicTestCase):
 
 		self.assertEqual(call("treatments.get_treatment_plan", name=plan)["estimated_total"], 450)
 		listed = next(
-			r for r in call("treatments.list_treatment_plans", customer=patient) if r["name"] == plan
+			r for r in call("treatments.list_treatment_plans", customer=patient)["rows"] if r["name"] == plan
 		)
 		self.assertEqual(listed["estimated_total"], 450)
 

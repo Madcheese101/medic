@@ -3,10 +3,12 @@ shared with its desk form."""
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
 from frappe.utils import cint, today
 
 from medic.billing import cashier_rates, company_currency, financials, invoice_financials
 from medic.medic.doctype.test_request.test_request import complete_test, make_sales_invoice, start_test
+from medic.medic.page.medic_pos.api.lists import order_by
 
 
 def _test_request_row(tr):
@@ -26,8 +28,17 @@ def _test_request_row(tr):
 
 
 @frappe.whitelist()
-def list_test_requests(customer=None, status=None, limit=100):
-	"""Standalone Lab Tests list, filters applied on the DB."""
+def list_test_requests(customer=None, status=None, start=0, page_length=20, sort_by=None, sort_order=None):
+	"""One page of the standalone Lab Tests list, filters applied on the DB."""
+	filters = {"docstatus": 1}
+	if customer:
+		filters["patient"] = customer
+	if status:
+		filters["status"] = status
+	sort_field, direction = order_by(
+		sort_by, sort_order, ("name", "posting_date", "status", "sales_invoice"), "creation desc"
+	).split()
+
 	tr = frappe.qb.DocType("Test Request")
 	cust = frappe.qb.DocType("Customer")
 	si = frappe.qb.DocType("Sales Invoice")
@@ -49,14 +60,12 @@ def list_test_requests(customer=None, status=None, limit=100):
 			si.grand_total.as_("grand_total"),
 			si.outstanding_amount.as_("outstanding_amount"),
 		)
-		.where(tr.docstatus == 1)
-		.orderby(tr.creation, order=frappe.qb.desc)
-		.limit(cint(limit))
+		.orderby(tr[sort_field], order=Order[direction])
+		.limit(cint(page_length))
+		.offset(cint(start))
 	)
-	if customer:
-		q = q.where(tr.patient == customer)
-	if status:
-		q = q.where(tr.status == status)
+	for field, value in filters.items():
+		q = q.where(tr[field] == value)
 	rows = q.run(as_dict=True)
 
 	items = {}
@@ -81,7 +90,7 @@ def list_test_requests(customer=None, status=None, limit=100):
 			r.update(invoice_financials(None))
 			r["estimated_total"] = sum(rates[code] for code in codes)
 		r["currency"] = currency
-	return rows
+	return {"rows": rows, "total": frappe.db.count("Test Request", filters)}
 
 
 @frappe.whitelist()

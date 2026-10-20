@@ -10,7 +10,7 @@ class TestLabTests(MedicTestCase):
 		patient = self.make_patient()
 		name = call("lab.create_test_request", patient=patient, items=self.fx.lab_items)
 
-		row = next(r for r in call("lab.list_test_requests", customer=patient) if r["name"] == name)
+		row = next(r for r in call("lab.list_test_requests", customer=patient)["rows"] if r["name"] == name)
 		self.assertEqual(row["patient_name"], frappe.db.get_value("Customer", patient, "customer_name"))
 		self.assertEqual(row["item_count"], 2)
 		self.assertEqual(row["status"], "Pending")

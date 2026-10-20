@@ -10,7 +10,7 @@
 				item-props
 				style="max-width: 220px"
 				@update:search="searchCustomers"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
 			<v-select
 				v-model="filters.status"
@@ -18,7 +18,7 @@
 				:label="__('Status')"
 				clearable
 				style="max-width: 180px"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
 			<v-text-field
 				v-model="filters.from_date"
@@ -26,7 +26,7 @@
 				:label="__('From')"
 				clearable
 				style="max-width: 170px"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
 			<v-text-field
 				v-model="filters.to_date"
@@ -34,17 +34,20 @@
 				:label="__('To')"
 				clearable
 				style="max-width: 170px"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
-			<v-btn color="primary" variant="tonal" icon="mdi-filter-outline" :title="__('Apply filters')" @click="load" />
+			<v-btn color="primary" variant="tonal" icon="mdi-filter-outline" :title="__('Apply filters')" @click="table.reload" />
 		</v-card-text>
 
-		<v-data-table
+		<v-data-table-server
+			v-model:page="table.page"
 			:headers="headers"
-			:items="rows"
-			:loading="loading"
+			:items="table.rows"
+			:items-length="table.total"
+			:loading="table.loading"
 			density="comfortable"
 			:no-data-text="__('No invoices found')"
+			@update:options="table.onOptions"
 		>
 			<template #item.posting_date="{ item }">
 				{{ formatDate(item.posting_date) }}
@@ -99,7 +102,7 @@
 					@click="refs.openInvoice(item.name)"
 				/>
 			</template>
-		</v-data-table>
+		</v-data-table-server>
 	</v-card>
 
 	<SplitPaymentDialog
@@ -109,7 +112,7 @@
 		:currency="payTarget.currency"
 		method="billing.record_payments"
 		:extra-args="{ invoice: payTarget.name }"
-		@paid="load"
+		@paid="table.load"
 	/>
 
 	<SplitPaymentDialog
@@ -120,23 +123,23 @@
 		method="appointments.pay_appointment_action"
 		:extra-args="{ invoice: payActionTarget.name }"
 		require-full
-		@paid="load"
+		@paid="table.load"
 	/>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { call, debounce, formatCurrency, printDoc, searchLinkOptions } from "../client.js";
+import { debounce, formatCurrency, printDoc, searchLinkOptions } from "../client.js";
 import { SALES_INVOICE_STATUS, invoiceStatusColor } from "../constants.js";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import { useReferences } from "../references.js";
+import { useServerTable } from "../serverTable.js";
 
 const refs = useReferences();
 
-const rows = ref([]);
-const loading = ref(false);
 const customerOptions = ref([]);
 const filters = reactive({ customer: null, status: null, from_date: "", to_date: "" });
+const table = useServerTable("billing.get_sales_invoices", () => filters);
 
 const payOpen = ref(false);
 const payTarget = ref({});
@@ -161,15 +164,6 @@ const searchCustomers = debounce(async (txt) => {
 	customerOptions.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
 });
 
-async function load() {
-	loading.value = true;
-	try {
-		rows.value = await call("billing.get_sales_invoices", { ...filters });
-	} finally {
-		loading.value = false;
-	}
-}
-
 function openPay(item) {
 	payTarget.value = item;
 	payOpen.value = true;
@@ -180,8 +174,5 @@ function openPayAction(item) {
 	payActionOpen.value = true;
 }
 
-onMounted(() => {
-	searchCustomers("");
-	load();
-});
+onMounted(() => searchCustomers(""));
 </script>

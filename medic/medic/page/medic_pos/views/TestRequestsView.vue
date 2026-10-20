@@ -10,7 +10,7 @@
 				item-props
 				style="max-width: 220px"
 				@update:search="searchCustomers"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
 			<v-select
 				v-model="filters.status"
@@ -18,21 +18,24 @@
 				:label="__('Status')"
 				clearable
 				style="max-width: 180px"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
-			<v-btn color="primary" variant="tonal" icon="mdi-filter-outline" :title="__('Apply filters')" @click="load" />
+			<v-btn color="primary" variant="tonal" icon="mdi-filter-outline" :title="__('Apply filters')" @click="table.reload" />
 			<v-spacer />
 			<v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="newOpen = true">
 				{{ __("New Test Request") }}
 			</v-btn>
 		</v-card-text>
 
-		<v-data-table
+		<v-data-table-server
+			v-model:page="table.page"
 			:headers="headers"
-			:items="rows"
-			:loading="loading"
+			:items="table.rows"
+			:items-length="table.total"
+			:loading="table.loading"
 			density="comfortable"
 			:no-data-text="__('No test requests found')"
+			@update:options="table.onOptions"
 		>
 			<template #item.status="{ item }">
 				<v-chip size="small" variant="tonal" :color="testRequestStatusColor(item.status)">{{ item.status }}</v-chip>
@@ -74,35 +77,36 @@
 					@click="refs.openTestRequest(item.name)"
 				/>
 			</template>
-		</v-data-table>
+		</v-data-table-server>
 	</v-card>
 
-	<NewTestRequestDialog v-model="newOpen" @created="load" />
+	<NewTestRequestDialog v-model="newOpen" @created="table.load" />
 
-	<TestRequestInvoiceDialog v-model="invoiceOpen" :name="invoiceTarget.name" @created="load" />
+	<TestRequestInvoiceDialog v-model="invoiceOpen" :name="invoiceTarget.name" @created="table.load" />
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { call, debounce, printDoc, searchLinkOptions } from "../client.js";
+import { debounce, printDoc, searchLinkOptions } from "../client.js";
 import { testRequestStatusColor } from "../constants.js";
 import NewTestRequestDialog from "../components/NewTestRequestDialog.vue";
 import TestRequestInvoiceDialog from "../components/TestRequestInvoiceDialog.vue";
 import { useReferences } from "../references.js";
+import { useServerTable } from "../serverTable.js";
 
 const refs = useReferences();
 
-const rows = ref([]);
-const loading = ref(false);
 const newOpen = ref(false);
 const invoiceOpen = ref(false);
 const invoiceTarget = ref({});
 const customerOptions = ref([]);
 const filters = reactive({ customer: null, status: null });
+const table = useServerTable("lab.list_test_requests", () => filters);
 
 const headers = computed(() => [
 	{ title: __("Request"), key: "name" },
-	{ title: __("Patient"), key: "patient_name" },
+	// Joined in on the server, which can't sort on it.
+	{ title: __("Patient"), key: "patient_name", sortable: false },
 	{ title: __("Tests"), key: "item_count", sortable: false },
 	{ title: __("Invoice"), key: "sales_invoice" },
 	{ title: __("Status"), key: "status" },
@@ -114,22 +118,10 @@ const searchCustomers = debounce(async (txt) => {
 	customerOptions.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
 });
 
-async function load() {
-	loading.value = true;
-	try {
-		rows.value = await call("lab.list_test_requests", { ...filters });
-	} finally {
-		loading.value = false;
-	}
-}
-
 function openInvoice(item) {
 	invoiceTarget.value = item;
 	invoiceOpen.value = true;
 }
 
-onMounted(() => {
-	searchCustomers("");
-	load();
-});
+onMounted(() => searchCustomers(""));
 </script>

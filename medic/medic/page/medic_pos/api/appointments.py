@@ -18,6 +18,7 @@ from medic.billing import (
 	validated_discount,
 )
 from medic.constants import ActionType, AppointmentStatus, AppointmentType, label
+from medic.medic.page.medic_pos.api.lists import order_by
 
 # ---------------------------------------------------------------- availability
 
@@ -107,11 +108,29 @@ APPOINTMENT_LIST_FIELDS = (
 	"queue",
 	"docstatus",
 )
+# The doctor and service names come from joined tables, so the list can't sort on them.
+APPOINTMENT_SORTABLE = (
+	"name",
+	"appointment_date",
+	"appointment_type",
+	"customer_name",
+	"appointment_status",
+	"queue",
+)
 
 
 @frappe.whitelist()
-def get_appointments(customer=None, employee=None, appointment_date=None, appointment_status=None, limit=100):
-	"""Appointment list with filters applied on the DB."""
+def get_appointments(
+	customer=None,
+	employee=None,
+	appointment_date=None,
+	appointment_status=None,
+	start=0,
+	page_length=20,
+	sort_by=None,
+	sort_order=None,
+):
+	"""One page of the appointment list, with filters applied on the DB."""
 	filters = {}
 	if customer:
 		filters["customer"] = customer
@@ -122,13 +141,15 @@ def get_appointments(customer=None, employee=None, appointment_date=None, appoin
 	if appointment_status:
 		filters["appointment_status"] = appointment_status
 
-	return frappe.qb.get_query(
+	rows = frappe.qb.get_query(
 		"Patient Appointment",
 		fields=list(APPOINTMENT_LIST_FIELDS),
 		filters=filters,
-		order_by="appointment_date desc, creation desc",
-		limit=limit,
+		order_by=order_by(sort_by, sort_order, APPOINTMENT_SORTABLE, "appointment_date desc, creation desc"),
+		limit=cint(page_length),
+		offset=cint(start),
 	).run(as_dict=True)
+	return {"rows": rows, "total": frappe.db.count("Patient Appointment", filters)}
 
 
 @frappe.whitelist()

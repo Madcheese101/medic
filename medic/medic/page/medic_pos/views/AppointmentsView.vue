@@ -10,7 +10,7 @@
 				item-props
 				style="max-width: 220px"
 				@update:search="searchCustomers"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
 			<v-autocomplete
 				v-model="filters.employee"
@@ -21,7 +21,7 @@
 				item-props
 				style="max-width: 220px"
 				@update:search="searchEmployees"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
 			<v-text-field
 				v-model="filters.appointment_date"
@@ -29,7 +29,7 @@
 				:label="__('Date')"
 				clearable
 				style="max-width: 190px"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
 			<v-select
 				v-model="filters.appointment_status"
@@ -37,9 +37,9 @@
 				:label="__('Status')"
 				clearable
 				style="max-width: 180px"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
-			<v-btn color="primary" variant="tonal" icon="mdi-filter-outline" :title="__('Apply filters')" @click="load" />
+			<v-btn color="primary" variant="tonal" icon="mdi-filter-outline" :title="__('Apply filters')" @click="table.reload" />
 			<v-spacer />
 			<v-btn color="primary" variant="tonal" prepend-icon="mdi-calendar-account" class="mr-2" @click="sessionOpen = true">
 				{{ __("New Session") }}
@@ -49,12 +49,15 @@
 			</v-btn>
 		</v-card-text>
 
-		<v-data-table
+		<v-data-table-server
+			v-model:page="table.page"
 			:headers="headers"
-			:items="rows"
-			:loading="loading"
+			:items="table.rows"
+			:items-length="table.total"
+			:loading="table.loading"
 			density="comfortable"
 			:no-data-text="__('No appointments found')"
+			@update:options="table.onOptions"
 		>
 			<template #item.appointment_date="{ item }">
 				{{ formatDate(item.appointment_date) }}
@@ -112,12 +115,12 @@
 					@click="view(item.name)"
 				/>
 			</template>
-		</v-data-table>
+		</v-data-table-server>
 	</v-card>
 
 	<NewAppointmentForm v-else :initial-new="createNew" @created="onCreated" @cancel="creating = false" />
 
-	<NewSessionDialog v-model="sessionOpen" @created="load" />
+	<NewSessionDialog v-model="sessionOpen" @created="table.load" />
 
 	<SplitPaymentDialog
 		v-model="payOpen"
@@ -128,7 +131,7 @@
 		:extra-args="{ name: payTarget.name }"
 		:require-full="payTarget.appointment_type === AppointmentType.CONSULTATION"
 		:modes="cashierModes"
-		@paid="load"
+		@paid="table.load"
 	/>
 </template>
 
@@ -142,6 +145,7 @@ import {
 	appointmentStatusColor,
 	label,
 } from "../constants.js";
+import { useServerTable } from "../serverTable.js";
 import { useUiStore } from "../stores/ui.js";
 import NewAppointmentForm from "../components/NewAppointmentForm.vue";
 import NewSessionDialog from "../components/NewSessionDialog.vue";
@@ -154,8 +158,6 @@ const uiStore = useUiStore();
 // Cashier POS Profile modes for front-desk collections; null falls back to all modes.
 const cashierModes = frappe.boot.cashier_payment_modes?.length ? frappe.boot.cashier_payment_modes : null;
 const today = frappe.datetime.get_today();
-const rows = ref([]);
-const loading = ref(false);
 const creating = ref(false);
 const createNew = ref(false);
 const sessionOpen = ref(false);
@@ -172,15 +174,18 @@ const filters = reactive({
 	appointment_status: null,
 });
 
+const table = useServerTable("appointments.get_appointments", () => filters);
+
+// The doctor and service names are joined in on the server, which can't sort on them.
 const headers = computed(() => [
 	{ title: __("Appointment"), key: "name" },
 	{ title: __("Date"), key: "appointment_date" },
 	{ title: __("Type"), key: "appointment_type" },
 	{ title: __("Patient"), key: "customer_name" },
-	{ title: __("Doctor"), key: "doctor_name" },
-	{ title: __("Service"), key: "service_name" },
+	{ title: __("Doctor"), key: "doctor_name", sortable: false },
+	{ title: __("Service"), key: "service_name", sortable: false },
 	{ title: __("Status"), key: "appointment_status" },
-	{ title: __("Queue"), key: "queue", sortable: false },
+	{ title: __("Queue"), key: "queue" },
 	{ title: "", key: "actions", sortable: false, align: "end" },
 ]);
 
@@ -198,15 +203,6 @@ const searchEmployees = debounce(async (txt) => {
 		: {};
 	employeeOptions.value = await searchLinkOptions("Employee", txt, filters, "employee_name");
 });
-
-async function load() {
-	loading.value = true;
-	try {
-		rows.value = await call("appointments.get_appointments", { ...filters });
-	} finally {
-		loading.value = false;
-	}
-}
 
 function view(name) {
 	emit("navigate", "appointment", { name });
@@ -244,7 +240,6 @@ watch(
 
 function onCreated() {
 	creating.value = false;
-	load();
 }
 
 async function checkIn(name) {
@@ -252,7 +247,7 @@ async function checkIn(name) {
 	try {
 		const q = await call("appointments.check_in", { appointment: name });
 		notifySuccess(__("Checked in — queue {0}", [q]));
-		await load();
+		await table.load();
 	} finally {
 		checkingIn.value = null;
 	}
@@ -261,6 +256,5 @@ async function checkIn(name) {
 onMounted(() => {
 	searchCustomers("");
 	searchEmployees("");
-	load();
 });
 </script>

@@ -18,6 +18,7 @@ export {
 	VCol,
 	VContainer,
 	VDataTable,
+	VDataTableServer,
 	VDatePicker,
 	VDialog,
 	VDivider,

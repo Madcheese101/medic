@@ -130,6 +130,23 @@ class TestAppointmentPayments(MedicTestCase):
 		self.assertEqual(row["outstanding_amount"], 0)
 
 
+class TestLists(MedicTestCase):
+	def test_lists_sort_only_on_their_own_columns(self):
+		patient = self.make_patient()
+		older = self.make_appointment(patient=patient)
+		newer = self.make_appointment(patient=patient)
+
+		rows = call(
+			"appointments.get_appointments", customer=patient, sort_by="name", sort_order="asc"
+		)["rows"]
+		self.assertEqual([r["name"] for r in rows], sorted([older, newer]))
+		# Anything else keeps the default order (newest first) instead of reaching the SQL.
+		rows = call(
+			"appointments.get_appointments", customer=patient, sort_by="name; select 1", sort_order="asc"
+		)["rows"]
+		self.assertEqual([r["name"] for r in rows], [newer, older])
+
+
 def _payment_entry_for(invoice):
 	return frappe.db.get_value(
 		"Payment Entry Reference",

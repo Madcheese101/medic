@@ -4,6 +4,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, today
 
+from medic.medic.page.medic_pos.api.lists import order_by
 from medic.medic.page.medic_pos.api.patients import phone_like
 
 # Each context maps to a Clinic Setup POS Profile + Item Group, so the same POS
@@ -221,7 +222,11 @@ def create_pos_invoice(context, customer, items, payments, prescription=None):
 
 
 @frappe.whitelist()
-def list_prescriptions(customer=None, mobile=None, include_invoiced=0):
+def list_prescriptions(
+	customer=None, mobile=None, include_invoiced=0, start=0, page_length=20, sort_by=None, sort_order=None
+):
+	"""One page of the prescriptions list. The patient's name and mobile come from the joined
+	Customer, so the list can't sort on them."""
 	filters = {}
 	if customer:
 		filters["patient"] = customer
@@ -231,7 +236,7 @@ def list_prescriptions(customer=None, mobile=None, include_invoiced=0):
 		matches = frappe.get_all("Customer", filters={"phone_number": phone_like(mobile)}, pluck="name")
 		filters["patient"] = ["in", matches or [""]]
 
-	return frappe.qb.get_query(
+	rows = frappe.qb.get_query(
 		"Prescription",
 		fields=[
 			"name",
@@ -243,5 +248,8 @@ def list_prescriptions(customer=None, mobile=None, include_invoiced=0):
 			"sales_invoice",
 		],
 		filters=filters,
-		order_by="creation desc",
+		order_by=order_by(sort_by, sort_order, ("name", "posting_date", "invoice_created"), "creation desc"),
+		limit=cint(page_length),
+		offset=cint(start),
 	).run(as_dict=True)
+	return {"rows": rows, "total": frappe.db.count("Prescription", filters)}

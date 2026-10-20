@@ -16,11 +16,13 @@ from medic.billing import (
 )
 from medic.constants import AppointmentStatus, AppointmentType
 from medic.medic.page.medic_pos.api.appointments import validate_appointment_date
+from medic.medic.page.medic_pos.api.lists import order_by
 
 
 # Shared by the list endpoints. `invoice` is a plain Data field (not a Link), so it can't
 # be auto-joined via get_query's dotted fetch — build the joins explicitly instead.
-def _treatment_plans_query(filters, order_by_creation=False, limit=None):
+def _treatment_plans_query(filters, sort=None, limit=None, offset=None):
+	"""`sort` is "<Treatment Plan field> asc|desc"."""
 	tp = frappe.qb.DocType("Treatment Plan")
 	cust = frappe.qb.DocType("Customer")
 	emp = frappe.qb.DocType("Employee")
@@ -56,10 +58,13 @@ def _treatment_plans_query(filters, order_by_creation=False, limit=None):
 	)
 	for field, value in filters.items():
 		q = q.where(tp[field] == value)
-	if order_by_creation:
-		q = q.orderby(tp.creation, order=Order.desc)
+	if sort:
+		field, direction = sort.split()
+		q = q.orderby(tp[field], order=Order[direction])
 	if limit:
 		q = q.limit(limit)
+	if offset:
+		q = q.offset(offset)
 	return q
 
 
@@ -164,7 +169,7 @@ def add_treatment_sessions(name, sessions):
 @frappe.whitelist()
 def get_treatment_plans(customer):
 	currency = company_currency()
-	rows = _treatment_plans_query({"customer": customer, "docstatus": 1}, order_by_creation=True).run(
+	rows = _treatment_plans_query({"customer": customer, "docstatus": 1}, sort="creation desc").run(
 		as_dict=True
 	)
 	for r in rows:
@@ -190,8 +195,11 @@ def get_active_treatment_plans(customer=None):
 
 
 @frappe.whitelist()
-def list_treatment_plans(customer=None, employee=None, status=None, limit=100):
-	"""Standalone Treatments view list, filters applied on the DB."""
+def list_treatment_plans(
+	customer=None, employee=None, status=None, start=0, page_length=20, sort_by=None, sort_order=None
+):
+	"""One page of the standalone Treatments view list, filters applied on the DB. The patient,
+	doctor and service names come from joined tables, so the list can't sort on them."""
 	filters = {"docstatus": 1}
 	if customer:
 		filters["customer"] = customer
@@ -200,7 +208,12 @@ def list_treatment_plans(customer=None, employee=None, status=None, limit=100):
 	if status:
 		filters["status"] = status
 
-	rows = _treatment_plans_query(filters, order_by_creation=True, limit=limit).run(as_dict=True)
+	rows = _treatment_plans_query(
+		filters,
+		sort=order_by(sort_by, sort_order, ("name", "status", "invoice"), "creation desc"),
+		limit=cint(page_length),
+		offset=cint(start),
+	).run(as_dict=True)
 	# Deposit target for plans that have no invoice yet.
 	rates = cashier_rates(r.service for r in rows if not r.grand_total)
 	for r in rows:
@@ -208,7 +221,7 @@ def list_treatment_plans(customer=None, employee=None, status=None, limit=100):
 			rates.get(r.service), r.total_sessions, r.discount_percentage
 		)
 		_apply_financials(r)
-	return rows
+	return {"rows": rows, "total": frappe.db.count("Treatment Plan", filters)}
 
 
 @frappe.whitelist()

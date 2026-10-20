@@ -10,7 +10,7 @@
 				item-props
 				style="max-width: 220px"
 				@update:search="searchCustomers"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
 			<v-autocomplete
 				v-model="filters.employee"
@@ -21,7 +21,7 @@
 				item-props
 				style="max-width: 220px"
 				@update:search="searchEmployees"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
 			<v-select
 				v-model="filters.status"
@@ -29,21 +29,24 @@
 				:label="__('Status')"
 				clearable
 				style="max-width: 180px"
-				@update:model-value="load"
+				@update:model-value="table.reload"
 			/>
-			<v-btn color="primary" variant="tonal" icon="mdi-filter-outline" :title="__('Apply filters')" @click="load" />
+			<v-btn color="primary" variant="tonal" icon="mdi-filter-outline" :title="__('Apply filters')" @click="table.reload" />
 			<v-spacer />
 			<v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="newOpen = true">
 				{{ __("New Treatment") }}
 			</v-btn>
 		</v-card-text>
 
-		<v-data-table
+		<v-data-table-server
+			v-model:page="table.page"
 			:headers="headers"
-			:items="rows"
-			:loading="loading"
+			:items="table.rows"
+			:items-length="table.total"
+			:loading="table.loading"
 			density="comfortable"
 			:no-data-text="__('No treatment plans found')"
+			@update:options="table.onOptions"
 		>
 			<template #item.status="{ item }">
 				<v-chip size="small" variant="tonal" :color="treatmentStatusColor(item.status)">{{ item.status }}</v-chip>
@@ -84,10 +87,10 @@
 					@click="refs.openTreatmentPlan(item.name)"
 				/>
 			</template>
-		</v-data-table>
+		</v-data-table-server>
 	</v-card>
 
-	<NewTreatmentDialog v-model="newOpen" @created="load" />
+	<NewTreatmentDialog v-model="newOpen" @created="table.load" />
 
 	<SplitPaymentDialog
 		v-model="depositOpen"
@@ -97,37 +100,38 @@
 		method="treatments.create_treatment_plan_invoice"
 		:extra-args="{ name: depositTarget.name }"
 		:modes="cashierModes"
-		@paid="load"
+		@paid="table.load"
 	/>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { call, debounce, printDoc, searchLinkOptions } from "../client.js";
+import { debounce, printDoc, searchLinkOptions } from "../client.js";
 import { treatmentStatusColor } from "../constants.js";
 import NewTreatmentDialog from "../components/NewTreatmentDialog.vue";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import { useReferences } from "../references.js";
+import { useServerTable } from "../serverTable.js";
 
 const refs = useReferences();
 
 // Cashier POS Profile modes for the deposit; null falls back to all modes.
 const cashierModes = frappe.boot.cashier_payment_modes?.length ? frappe.boot.cashier_payment_modes : null;
 
-const rows = ref([]);
-const loading = ref(false);
 const newOpen = ref(false);
 const depositOpen = ref(false);
 const depositTarget = ref({});
 const customerOptions = ref([]);
 const employeeOptions = ref([]);
 const filters = reactive({ customer: null, employee: null, status: null });
+const table = useServerTable("treatments.list_treatment_plans", () => filters);
 
+// The patient, service and doctor names are joined in on the server, which can't sort on them.
 const headers = computed(() => [
 	{ title: __("Plan"), key: "name" },
-	{ title: __("Patient"), key: "customer_name" },
-	{ title: __("Service"), key: "service" },
-	{ title: __("Doctor"), key: "doctor_name" },
+	{ title: __("Patient"), key: "customer_name", sortable: false },
+	{ title: __("Service"), key: "service", sortable: false },
+	{ title: __("Doctor"), key: "doctor_name", sortable: false },
 	{ title: __("Invoice"), key: "invoice" },
 	{ title: __("Status"), key: "status" },
 	{ title: __("Sessions"), key: "sessions", sortable: false },
@@ -146,15 +150,6 @@ const searchEmployees = debounce(async (txt) => {
 	employeeOptions.value = await searchLinkOptions("Employee", txt, filters, "employee_name");
 });
 
-async function load() {
-	loading.value = true;
-	try {
-		rows.value = await call("treatments.list_treatment_plans", { ...filters });
-	} finally {
-		loading.value = false;
-	}
-}
-
 function openDeposit(item) {
 	depositTarget.value = item;
 	depositOpen.value = true;
@@ -163,6 +158,5 @@ function openDeposit(item) {
 onMounted(() => {
 	searchCustomers("");
 	searchEmployees("");
-	load();
 });
 </script>

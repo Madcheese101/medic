@@ -17,6 +17,7 @@ from medic.billing import (
 	validated_discount,
 )
 from medic.constants import AppointmentStatus, label
+from medic.medic.page.medic_pos.api.lists import date_range, order_by
 
 
 @frappe.whitelist()
@@ -74,27 +75,34 @@ SALES_INVOICE_LIST_FIELDS = (
 
 
 @frappe.whitelist()
-def get_sales_invoices(customer=None, status=None, from_date=None, to_date=None, limit=100):
-	"""Sales Invoice list for the company, filters applied on the DB."""
+def get_sales_invoices(
+	customer=None,
+	status=None,
+	from_date=None,
+	to_date=None,
+	start=0,
+	page_length=20,
+	sort_by=None,
+	sort_order=None,
+):
+	"""One page of the company's Sales Invoices, filters applied on the DB."""
 	filters = {"company": company()}
 	if customer:
 		filters["customer"] = customer
 	if status:
 		filters["status"] = status
-	if from_date and to_date:
-		filters["posting_date"] = ["between", [from_date, to_date]]
-	elif from_date:
-		filters["posting_date"] = [">=", from_date]
-	elif to_date:
-		filters["posting_date"] = ["<=", to_date]
+	if dates := date_range(from_date, to_date):
+		filters["posting_date"] = dates
 
-	return frappe.qb.get_query(
+	rows = frappe.qb.get_query(
 		"Sales Invoice",
 		fields=list(SALES_INVOICE_LIST_FIELDS),
 		filters=filters,
-		order_by="posting_date desc, creation desc",
-		limit=limit,
+		order_by=order_by(sort_by, sort_order, SALES_INVOICE_LIST_FIELDS, "posting_date desc, creation desc"),
+		limit=cint(page_length),
+		offset=cint(start),
 	).run(as_dict=True)
+	return {"rows": rows, "total": frappe.db.count("Sales Invoice", filters)}
 
 
 @frappe.whitelist()

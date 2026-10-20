@@ -7,7 +7,7 @@
 				prepend-inner-icon="mdi-account-outline"
 				clearable
 				style="max-width: 220px"
-				@keyup.enter="load"
+				@keyup.enter="table.reload"
 			/>
 			<v-text-field
 				v-model="filters.mobile"
@@ -15,7 +15,7 @@
 				prepend-inner-icon="mdi-phone-outline"
 				clearable
 				style="max-width: 200px"
-				@keyup.enter="load"
+				@keyup.enter="table.reload"
 			/>
 			<v-text-field
 				v-model="filters.file_no"
@@ -23,21 +23,24 @@
 				prepend-inner-icon="mdi-file-document-outline"
 				clearable
 				style="max-width: 180px"
-				@keyup.enter="load"
+				@keyup.enter="table.reload"
 			/>
-			<v-btn color="primary" variant="tonal" icon="mdi-filter-outline" :title="__('Apply filters')" @click="load" />
+			<v-btn color="primary" variant="tonal" icon="mdi-filter-outline" :title="__('Apply filters')" @click="table.reload" />
 			<v-spacer />
 			<v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="newOpen = true">
 				{{ __("New Patient") }}
 			</v-btn>
 		</v-card-text>
 
-		<v-data-table
+		<v-data-table-server
+			v-model:page="table.page"
 			:headers="headers"
-			:items="rows"
-			:loading="loading"
+			:items="table.rows"
+			:items-length="table.total"
+			:loading="table.loading"
 			density="comfortable"
 			:no-data-text="__('No patients found')"
+			@update:options="table.onOptions"
 		>
 			<template #item.date_of_birth="{ item }">
 				{{ formatDate(item.date_of_birth) }}
@@ -58,23 +61,22 @@
 					@click="view(item.name)"
 				/>
 			</template>
-		</v-data-table>
+		</v-data-table-server>
 	</v-card>
 
-	<NewPatientDialog v-model="newOpen" @created="load" />
+	<NewPatientDialog v-model="newOpen" @created="table.load" />
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
-import { call } from "../client.js";
+import { computed, reactive, ref } from "vue";
+import { useServerTable } from "../serverTable.js";
 import NewPatientDialog from "../components/NewPatientDialog.vue";
 
 const emit = defineEmits(["navigate"]);
 
-const rows = ref([]);
-const loading = ref(false);
 const newOpen = ref(false);
 const filters = reactive({ customer_name: "", mobile: "", file_no: "" });
+const table = useServerTable("patients.get_patients", () => filters);
 
 const headers = computed(() => [
 	{ title: __("File No"), key: "name" },
@@ -90,18 +92,7 @@ function formatDate(value) {
 	return value ? frappe.datetime.str_to_user(value) : "";
 }
 
-async function load() {
-	loading.value = true;
-	try {
-		rows.value = await call("patients.get_patients", { ...filters });
-	} finally {
-		loading.value = false;
-	}
-}
-
 function view(name) {
 	emit("navigate", "patient", { patient: name });
 }
-
-onMounted(load);
 </script>
