@@ -134,7 +134,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { call, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
+import { call, debounce, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
 import {
 	APPOINTMENT_STATUS,
 	AppointmentStatus,
@@ -188,16 +188,16 @@ function formatDate(value) {
 	return value ? frappe.datetime.str_to_user(value) : "";
 }
 
-async function searchCustomers(txt) {
+const searchCustomers = debounce(async (txt) => {
 	customerOptions.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
-}
+});
 
-async function searchEmployees(txt) {
+const searchEmployees = debounce(async (txt) => {
 	const filters = frappe.boot.default_doctor_designation
 		? { designation: frappe.boot.default_doctor_designation }
 		: {};
 	employeeOptions.value = await searchLinkOptions("Employee", txt, filters, "employee_name");
-}
+});
 
 async function load() {
 	loading.value = true;

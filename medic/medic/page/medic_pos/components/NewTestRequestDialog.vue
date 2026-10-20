@@ -55,7 +55,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
-import { call, notifySuccess, searchLinkOptions } from "../client.js";
+import { call, debounce, notifySuccess, searchLinkOptions } from "../client.js";
 import NewPatientDialog from "./NewPatientDialog.vue";
 
 const props = defineProps({
@@ -82,19 +82,21 @@ const model = reactive(blank());
 const required = (v) => !!v || __("Required");
 const nonEmpty = (v) => (Array.isArray(v) && v.length > 0) || __("Add at least one test");
 
-async function searchPatients(txt) {
+async function loadPatients(txt) {
 	patients.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
 }
 
+const searchPatients = debounce(loadPatients);
+
 // Select the patient just created, loading its option so the field shows the name.
 async function onPatientCreated(name) {
-	await searchPatients(name);
+	await loadPatients(name);
 	model.patient = name;
 }
 
-async function searchTests(txt) {
+const searchTests = debounce(async (txt) => {
 	tests.value = await searchLinkOptions("Item", txt, { item_type: "Lab Test" }, "item_name");
-}
+});
 
 async function save() {
 	const { valid } = await form.value.validate();

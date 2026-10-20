@@ -52,7 +52,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { customSearchLink } from "../client.js";
+import { customSearchLink, debounce } from "../client.js";
 
 const props = defineProps({
 	modelValue: { type: Array, default: () => [] },
@@ -71,12 +71,12 @@ function itemsFor(row) {
 	return row && !options.value.includes(row) ? [row, ...options.value] : options.value;
 }
 
-async function search(txt) {
+const search = debounce(async (txt) => {
 	loading.value = true;
 	const results = await customSearchLink("Illness", txt, { illness_type: props.illnessType });
 	options.value = results.map((r) => r.value);
 	loading.value = false;
-}
+});
 
 function update(next) {
 	emit("update:modelValue", next);

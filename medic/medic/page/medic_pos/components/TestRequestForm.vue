@@ -146,7 +146,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRtl } from "vuetify";
-import { call, confirmAction, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
+import { call, confirmAction, debounce, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
 import { testRequestStatusColor } from "../constants.js";
 import TestRequestInvoiceDialog from "./TestRequestInvoiceDialog.vue";
 import { useReferences } from "../references.js";
@@ -182,9 +182,9 @@ const canEditResults = computed(() => doc.value.status === "Ongoing" && results.
 
 const nonEmpty = (v) => (Array.isArray(v) && v.length > 0) || __("Add at least one test");
 
-async function searchTests(txt) {
+const searchTests = debounce(async (txt) => {
 	testOptions.value = await searchLinkOptions("Item", txt, { item_type: "Lab Test" }, "item_name");
-}
+});
 
 async function create() {
 	const { valid } = await form.value.validate();

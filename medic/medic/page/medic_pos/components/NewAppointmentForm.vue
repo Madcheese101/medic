@@ -33,7 +33,7 @@
 								prepend-inner-icon="mdi-account-outline"
 								item-props
 								:rules="[required]"
-								@update:search="(t) => searchLink('customer', 'Customer', t, {}, 'customer_name')"
+								@update:search="searchCustomers"
 							/>
 						</v-col>
 					</v-row>
@@ -108,7 +108,7 @@
 								prepend-inner-icon="mdi-doctor"
 								item-props
 								:rules="[required]"
-								@update:search="(t) => searchLink('employee', 'Employee', t, doctorFilters, 'employee_name')"
+								@update:search="searchEmployees"
 							/>
 						</v-col>
 						<v-col cols="12" md="6">
@@ -127,7 +127,7 @@
 								prepend-inner-icon="mdi-shape-outline"
 								item-props
 								:rules="[required]"
-								@update:search="(t) => searchLink('service_type', 'Item Group', t, serviceTypeFilters, 'name')"
+								@update:search="searchServiceTypes"
 								@update:model-value="onServiceTypeChange"
 							/>
 						</v-col>
@@ -140,7 +140,7 @@
 								item-props
 								:disabled="!appt.service_type"
 								:rules="[required]"
-								@update:search="(t) => searchLink('service', 'Item', t, { item_group: appt.service_type }, 'item_name')"
+								@update:search="searchServices"
 							/>
 						</v-col>
 						<v-col v-if="showDiscount" cols="12" md="6">
@@ -189,7 +189,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRtl } from "vuetify";
-import { call, customSearchLink, notifySuccess, searchLinkOptions } from "../client.js";
+import { call, customSearchLink, debounce, notifySuccess, searchLinkOptions } from "../client.js";
 import { APPOINTMENT_TYPES, AppointmentType, BLOOD_TYPES } from "../constants.js";
 import DoctorDatePicker from "./DoctorDatePicker.vue";
 import { canDiscount, discountRule, maxDiscount } from "../discount.js";
@@ -254,12 +254,24 @@ async function searchLink(field, doctype, txt, filters = {}, labelFieldname = nu
 	options[field] = await searchLinkOptions(doctype, txt, filters, labelFieldname);
 }
 
-async function searchGenders(txt) {
+// One debounce per field, so typing in one field never cancels another field's search.
+const searchCustomers = debounce((t) => searchLink("customer", "Customer", t, {}, "customer_name"));
+const searchEmployees = debounce((t) =>
+	searchLink("employee", "Employee", t, doctorFilters, "employee_name")
+);
+const searchServiceTypes = debounce((t) =>
+	searchLink("service_type", "Item Group", t, serviceTypeFilters.value, "name")
+);
+const searchServices = debounce((t) =>
+	searchLink("service", "Item", t, { item_group: appt.service_type }, "item_name")
+);
+
+const searchGenders = debounce(async (txt) => {
 	genderLoading.value = true;
 	const results = await customSearchLink("Gender", txt);
 	genders.value = results.map((r) => r.value);
 	genderLoading.value = false;
-}
+});
 
 // Service is scoped to the chosen service type, so reset it when the type changes.
 function onServiceTypeChange() {

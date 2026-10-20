@@ -56,7 +56,7 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
-import { call, notifySuccess, searchLinkOptions } from "../client.js";
+import { call, debounce, notifySuccess, searchLinkOptions } from "../client.js";
 import DoctorDatePicker from "./DoctorDatePicker.vue";
 
 const props = defineProps({ modelValue: { type: Boolean, default: false } });
@@ -80,9 +80,9 @@ const selectedPlanEmployee = computed(
 	() => planItems.value.find((p) => p.value === plan.value)?.employee || null,
 );
 
-async function searchCustomers(txt) {
+const searchCustomers = debounce(async (txt) => {
 	customers.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
-}
+});
 
 async function loadPlans() {
 	plan.value = null;

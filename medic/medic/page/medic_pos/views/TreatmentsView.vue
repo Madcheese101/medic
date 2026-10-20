@@ -103,7 +103,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { call, printDoc, searchLinkOptions } from "../client.js";
+import { call, debounce, printDoc, searchLinkOptions } from "../client.js";
 import { treatmentStatusColor } from "../constants.js";
 import NewTreatmentDialog from "../components/NewTreatmentDialog.vue";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
@@ -135,16 +135,16 @@ const headers = computed(() => [
 	{ title: "", key: "actions", sortable: false, align: "end" },
 ]);
 
-async function searchCustomers(txt) {
+const searchCustomers = debounce(async (txt) => {
 	customerOptions.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
-}
+});
 
-async function searchEmployees(txt) {
+const searchEmployees = debounce(async (txt) => {
 	const filters = frappe.boot.default_doctor_designation
 		? { designation: frappe.boot.default_doctor_designation }
 		: {};
 	employeeOptions.value = await searchLinkOptions("Employee", txt, filters, "employee_name");
-}
+});
 
 async function load() {
 	loading.value = true;

@@ -84,7 +84,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { call, printDoc, searchLinkOptions } from "../client.js";
+import { call, debounce, printDoc, searchLinkOptions } from "../client.js";
 import { testRequestStatusColor } from "../constants.js";
 import NewTestRequestDialog from "../components/NewTestRequestDialog.vue";
 import TestRequestInvoiceDialog from "../components/TestRequestInvoiceDialog.vue";
@@ -110,9 +110,9 @@ const headers = computed(() => [
 	{ title: "", key: "actions", sortable: false, align: "end" },
 ]);
 
-async function searchCustomers(txt) {
+const searchCustomers = debounce(async (txt) => {
 	customerOptions.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
-}
+});
 
 async function load() {
 	loading.value = true;

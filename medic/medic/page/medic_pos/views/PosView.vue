@@ -147,7 +147,7 @@
 						clearable
 						hide-details
 						class="mb-3"
-						@update:model-value="onSearch"
+						@update:model-value="searchItems"
 					/>
 					<v-list
 						:loading="loadingItems"
@@ -196,7 +196,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { call, formatCurrency, notifySuccess, searchLinkOptions } from "../client.js";
+import { call, debounce, formatCurrency, notifySuccess, searchLinkOptions } from "../client.js";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 
 const props = defineProps({
@@ -246,9 +246,9 @@ function amount(line) {
 	return Number(((Number(line.qty) || 0) * (Number(line.rate) || 0)).toFixed(2));
 }
 
-async function searchCustomers(txt) {
+const searchCustomers = debounce(async (txt) => {
 	customerOptions.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
-}
+});
 
 async function onSearch() {
 	loadingItems.value = true;
@@ -258,6 +258,8 @@ async function onSearch() {
 		loadingItems.value = false;
 	}
 }
+
+const searchItems = debounce(onSearch);
 
 function addToCart(item) {
 	const existing = cart.value.find((l) => l.item_code === item.item_code && l.uom === item.uom);

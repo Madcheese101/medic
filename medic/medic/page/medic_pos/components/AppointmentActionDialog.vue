@@ -64,7 +64,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
-import { call, notifySuccess, searchLinkOptions } from "../client.js";
+import { call, debounce, notifySuccess, searchLinkOptions } from "../client.js";
 import { canDiscount, discountRule, maxDiscount } from "../discount.js";
 import { ActionType, label } from "../constants.js";
 
@@ -97,15 +97,15 @@ const serviceTypeFilters = computed(() => {
 	return filters;
 });
 
-async function searchServiceTypes(txt) {
+const searchServiceTypes = debounce(async (txt) => {
 	const rows = await searchLinkOptions("Item Group", txt, serviceTypeFilters.value, "name");
 	// The action must be a different type than the appointment's service.
 	options.service_type = rows.filter((r) => r.value !== props.serviceType);
-}
+});
 
-async function searchServices(txt) {
+const searchServices = debounce(async (txt) => {
 	options.service = await searchLinkOptions("Item", txt, { item_group: model.service_type }, "item_name");
-}
+});
 
 // Service is scoped to the chosen service type, so reset it when the type changes.
 function onServiceTypeChange() {

@@ -17,7 +17,7 @@
 								prepend-inner-icon="mdi-account-outline"
 								:rules="[required]"
 								item-props
-								@update:search="(t) => searchLink('patients', 'Customer', t, 'customer_name')"
+								@update:search="searchPatients"
 							/>
 						</v-col>
 						<v-col cols="12" md="6">
@@ -28,7 +28,7 @@
 								prepend-inner-icon="mdi-doctor"
 								:rules="[required]"
 								item-props
-								@update:search="(t) => searchLink('doctors', 'Employee', t, 'employee_name')"
+								@update:search="searchDoctors"
 							/>
 						</v-col>
 						<v-col cols="12" md="6">
@@ -49,7 +49,7 @@
 								prepend-inner-icon="mdi-medical-bag"
 								:rules="[required]"
 								item-props
-								@update:search="(t) => searchLink('services', 'Item', t, 'item_name')"
+								@update:search="searchServices"
 							/>
 						</v-col>
 						<v-col cols="12" md="6">
@@ -103,7 +103,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
-import { call, notifySuccess, searchLinkOptions } from "../client.js";
+import { call, debounce, notifySuccess, searchLinkOptions } from "../client.js";
 import { canDiscount, discountRule, maxDiscount } from "../discount.js";
 
 const props = defineProps({
@@ -158,6 +158,11 @@ async function searchLink(target, doctype, txt, labelFieldname = null) {
 	else if (target === "patients") patients.value = list;
 	else services.value = list;
 }
+
+// One debounce per field, so typing in one field never cancels another field's search.
+const searchPatients = debounce((t) => searchLink("patients", "Customer", t, "customer_name"));
+const searchDoctors = debounce((t) => searchLink("doctors", "Employee", t, "employee_name"));
+const searchServices = debounce((t) => searchLink("services", "Item", t, "item_name"));
 
 function onCategoryChange() {
 	model.service = null;

@@ -126,7 +126,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { call, formatCurrency, printDoc, searchLinkOptions } from "../client.js";
+import { call, debounce, formatCurrency, printDoc, searchLinkOptions } from "../client.js";
 import { SALES_INVOICE_STATUS, invoiceStatusColor } from "../constants.js";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import { useReferences } from "../references.js";
@@ -157,9 +157,9 @@ function formatDate(value) {
 	return value ? frappe.datetime.str_to_user(value) : "";
 }
 
-async function searchCustomers(txt) {
+const searchCustomers = debounce(async (txt) => {
 	customerOptions.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
-}
+});
 
 async function load() {
 	loading.value = true;

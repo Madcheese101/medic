@@ -18,7 +18,7 @@
 				prepend-inner-icon="mdi-phone-outline"
 				clearable
 				style="max-width: 200px"
-				@update:model-value="load"
+				@update:model-value="loadSoon"
 			/>
 			<v-checkbox
 				v-model="filters.include_invoiced"
@@ -93,7 +93,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { call, searchLinkOptions } from "../client.js";
+import { call, debounce, searchLinkOptions } from "../client.js";
 import PrescriptionForm from "../components/PrescriptionForm.vue";
 
 const emit = defineEmits(["navigate"]);
@@ -121,9 +121,9 @@ function formatDate(value) {
 	return value ? frappe.datetime.str_to_user(value) : "";
 }
 
-async function searchCustomers(txt) {
+const searchCustomers = debounce(async (txt) => {
 	customerOptions.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
-}
+});
 
 async function load() {
 	loading.value = true;
@@ -137,6 +137,9 @@ async function load() {
 		loading.value = false;
 	}
 }
+
+// The mobile filter reloads as it is typed.
+const loadSoon = debounce(load);
 
 function view(item) {
 	selected.value = item;

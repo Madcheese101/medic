@@ -159,7 +159,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { useDisplay, useRtl } from "vuetify";
-import { call, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
+import { call, debounce, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
 import { PRESCRIPTION_PER, PRESCRIPTION_ROUTES } from "../constants.js";
 
 const props = defineProps({
@@ -198,10 +198,10 @@ function formatDate(value) {
 }
 
 // Prescribed items come from the pharmacy group when the clinic has one configured.
-async function searchItems(txt) {
+const searchItems = debounce(async (txt) => {
 	const filters = frappe.boot.pharmacy_item_group ? { item_group: frappe.boot.pharmacy_item_group } : {};
 	options.item = await searchLinkOptions("Item", txt, filters, "item_name");
-}
+});
 
 // Look up the chosen item's type/schedule flag to drive Times/Per/For validation.
 async function onItemChange(item) {

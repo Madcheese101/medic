@@ -49,6 +49,18 @@ export async function searchLinkOptions(doctype, txt, filters = {}, labelFieldna
 	}));
 }
 
+// Runs `fn` once `wait` ms pass without another call, so a search field sends one request
+// per pause in typing instead of one per keystroke. `cancel()` drops the pending call.
+export function debounce(fn, wait = 300) {
+	let timer = null;
+	const debounced = (...args) => {
+		clearTimeout(timer);
+		timer = setTimeout(() => fn(...args), wait);
+	};
+	debounced.cancel = () => clearTimeout(timer);
+	return debounced;
+}
+
 export function notifySuccess(message) {
 	frappe.show_alert({ message, indicator: "green" });
 }

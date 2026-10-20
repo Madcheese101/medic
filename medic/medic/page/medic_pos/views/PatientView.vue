@@ -119,7 +119,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRtl } from "vuetify";
-import { call, customSearchLink, formatCurrency, notifySuccess } from "../client.js";
+import { call, customSearchLink, debounce, formatCurrency, notifySuccess } from "../client.js";
 import { BLOOD_TYPES, IllnessType } from "../constants.js";
 import IllnessTable from "../components/IllnessTable.vue";
 import PatientTreatments from "../components/PatientTreatments.vue";
@@ -158,10 +158,10 @@ function required(value) {
 	return !!value || __("Required");
 }
 
-async function searchGenders(txt) {
+const searchGenders = debounce(async (txt) => {
 	const results = await customSearchLink("Gender", txt);
 	genders.value = results.map((r) => r.value);
-}
+});
 
 async function load() {
 	loading.value = true;
@@ -176,7 +176,7 @@ async function load() {
 		history.medical_history = mh?.medical_history || [];
 		history.skin_illness = mh?.skin_illness || [];
 
-		await searchGenders("");
+		searchGenders("");
 	} finally {
 		loading.value = false;
 	}

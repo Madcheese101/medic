@@ -72,7 +72,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
-import { call, customSearchLink, notifySuccess } from "../client.js";
+import { call, customSearchLink, debounce, notifySuccess } from "../client.js";
 import { BLOOD_TYPES } from "../constants.js";
 
 const props = defineProps({
@@ -104,12 +104,12 @@ function required(value) {
 	return !!value || __("Required");
 }
 
-async function searchGenders(txt) {
+const searchGenders = debounce(async (txt) => {
 	genderLoading.value = true;
 	const results = await customSearchLink("Gender", txt);
 	genders.value = results.map((r) => r.value);
 	genderLoading.value = false;
-}
+});
 
 async function save() {
 	const { valid } = await form.value.validate();
