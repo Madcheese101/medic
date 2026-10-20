@@ -62,6 +62,7 @@
 								:hint="__('e.g. 0912345678')"
 								:rules="[required]"
 							/>
+							<PhoneDuplicateAlert :phone="patient.phone_number" />
 						</v-col>
 						<v-col cols="12" md="6">
 							<v-autocomplete
@@ -192,6 +193,7 @@ import { useRtl } from "vuetify";
 import { call, customSearchLink, debounce, notifySuccess, searchLinkOptions } from "../client.js";
 import { APPOINTMENT_TYPES, AppointmentType, BLOOD_TYPES } from "../constants.js";
 import DoctorDatePicker from "./DoctorDatePicker.vue";
+import PhoneDuplicateAlert from "./PhoneDuplicateAlert.vue";
 import { canDiscount, discountRule, maxDiscount } from "../discount.js";
 
 const props = defineProps({

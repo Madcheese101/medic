@@ -58,6 +58,7 @@
 							:hint="__('e.g. 0912345678')"
 							:rules="[required]"
 						/>
+						<PhoneDuplicateAlert :phone="model.phone_number" :exclude="props.patient" />
 					</v-col>
 					<v-col cols="12" md="6">
 						<v-autocomplete
@@ -136,6 +137,7 @@ import { BLOOD_TYPES, IllnessType } from "../constants.js";
 import { useUiStore } from "../stores/ui.js";
 import IllnessTable from "../components/IllnessTable.vue";
 import PatientRecords from "../components/PatientRecords.vue";
+import PhoneDuplicateAlert from "../components/PhoneDuplicateAlert.vue";
 
 
 const props = defineProps({ patient: { type: String, default: null } });

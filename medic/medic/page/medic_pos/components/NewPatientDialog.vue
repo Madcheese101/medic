@@ -33,6 +33,7 @@
 								:hint="__('e.g. 0912345678')"
 								:rules="[required]"
 							/>
+							<PhoneDuplicateAlert :phone="model.phone_number" />
 						</v-col>
 						<v-col cols="12" md="6">
 							<v-autocomplete
@@ -74,6 +75,7 @@ import { computed, reactive, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
 import { call, customSearchLink, debounce, notifySuccess } from "../client.js";
 import { BLOOD_TYPES } from "../constants.js";
+import PhoneDuplicateAlert from "./PhoneDuplicateAlert.vue";
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },

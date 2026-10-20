@@ -29,3 +29,14 @@ class TestPatients(MedicTestCase):
 		rest = call("patients.get_patients", customer_name=prefix, start=2, page_length=2)
 		self.assertEqual(len(rest["rows"]), 1)
 		self.assertIn(rest["rows"][0]["name"], names)
+
+	def test_phone_matches_other_patients_only(self):
+		phone = f"+21892{random.randint(1000000, 9999999)}"
+		first = self.create(f"{P} Parent", phone)
+		second = self.create(f"{P} Child", phone)
+
+		matches = call("patients.patients_with_phone", phone_number=phone)
+		self.assertEqual({p["name"] for p in matches}, {first, second})
+		matches = call("patients.patients_with_phone", phone_number=phone, exclude=first)
+		self.assertEqual([p["name"] for p in matches], [second])
+		self.assertEqual(call("patients.patients_with_phone", phone_number=""), [])

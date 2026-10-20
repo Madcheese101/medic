@@ -4,6 +4,7 @@ import frappe
 from frappe.utils import cint, today
 
 from medic.billing import company
+from medic.events import e164
 from medic.medic.page.medic_pos.api.lists import order_by
 
 PATIENT_FIELDS = ("customer_name", "date_of_birth", "phone_number", "gender", "blood_type")
@@ -36,6 +37,19 @@ def get_patients(
 		offset=cint(start),
 	).run(as_dict=True)
 	return {"rows": rows, "total": frappe.db.count("Customer", filters)}
+
+
+@frappe.whitelist()
+def patients_with_phone(phone_number, exclude=None):
+	"""Other patients registered with this mobile number, so the forms can warn about a duplicate.
+	Numbers are stored in E.164, so the typed one is converted the same way first."""
+	number = e164(phone_number)
+	if not number:
+		return []
+	filters = {"phone_number": number}
+	if exclude:
+		filters["name"] = ["!=", exclude]
+	return frappe.get_all("Customer", filters=filters, fields=["name", "customer_name"], limit=5)
 
 
 @frappe.whitelist()
