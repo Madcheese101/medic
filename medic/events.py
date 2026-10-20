@@ -46,29 +46,6 @@ def on_customer_create(doc, method=None):
 		})
 		patient.save()
 
-def on_sales_invoice_submit(doc, method=None):
-	if not doc.patient_appointment and not doc.treatment_plan:
-		return
-
-	if doc.outstanding_amount > 0:
-		return
-
-	if doc.is_action_invoice:
-		doctype = "Appointment Actions"
-		filters = {"invoice": doc.name}
-		field = "paid"
-		value = 1
-	else:
-		doctype = "Patient Appointment"
-		filters = {"invoice": doc.name, "appointment_status": ["!=", "مؤكد"]}
-		field = "appointment_status"
-		value = "مؤكد"
-
-	exists = frappe.db.exists(doctype, filters)
-	if exists:
-		frappe.db.set_value(doctype, exists, field, value)
-		return
-
 def on_sales_invoice_cancel(doc, method=None):
 	if not doc.patient_appointment and not doc.treatment_plan:
 		return
