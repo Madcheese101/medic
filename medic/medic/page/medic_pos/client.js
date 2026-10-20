@@ -10,7 +10,7 @@ export async function call(method, args = {}) {
 // `labelFieldname` asks the server to attach that field's value to each row as `label`.
 export function customSearchLink(doctype, txt, filters = {}, labelFieldname = null) {
 	// Autocomplete fires per keystroke - degrade to an empty list instead of a dialog.
-	return call("custom_search_link", {
+	return call("search.custom_search_link", {
 		doctype,
 		txt: txt || "",
 		page_length: 20,

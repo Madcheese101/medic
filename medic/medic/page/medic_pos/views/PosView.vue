@@ -187,7 +187,7 @@
 		:currency="ctx.currency"
 		:modes="payModes"
 		require-full
-		method="create_pos_invoice"
+		method="pos.create_pos_invoice"
 		:extra-args="checkoutArgs"
 		@paid="onPaid"
 	/>
@@ -253,7 +253,7 @@ async function searchCustomers(txt) {
 async function onSearch() {
 	loadingItems.value = true;
 	try {
-		items.value = await call("pos_search_items", { context, txt: search.value || "" });
+		items.value = await call("pos.pos_search_items", { context, txt: search.value || "" });
 	} finally {
 		loadingItems.value = false;
 	}
@@ -269,7 +269,7 @@ function addToCart(item) {
 }
 
 async function onUomChange(line, uom) {
-	const { price_list_rate, conversion_factor } = await call("pos_item_price", {
+	const { price_list_rate, conversion_factor } = await call("pos.pos_item_price", {
 		context,
 		item_code: line.item_code,
 		uom,
@@ -308,14 +308,14 @@ function onPaid(result) {
 
 onMounted(async () => {
 	try {
-		ctx.value = await call("get_pos_context", { context });
+		ctx.value = await call("pos.get_pos_context", { context });
 	} finally {
 		loadingCtx.value = false;
 	}
 	if (!ctx.value) return;
 
 	if (props.prescription) {
-		const seeded = await call("get_prescription_cart", { context, prescription: props.prescription });
+		const seeded = await call("pos.get_prescription_cart", { context, prescription: props.prescription });
 		customer.value = seeded.customer;
 		cart.value = seeded.items;
 	} else {

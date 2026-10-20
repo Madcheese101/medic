@@ -59,15 +59,18 @@
 			<template #item.appointment_date="{ item }">
 				{{ formatDate(item.appointment_date) }}
 			</template>
+			<template #item.appointment_type="{ item }">
+				{{ label(item.appointment_type, "Patient Appointment") }}
+			</template>
 			<template #item.appointment_status="{ item }">
 				<v-chip size="small" variant="tonal" :color="appointmentStatusColor(item.appointment_status)">
-					{{ item.appointment_status || "—" }}
+					{{ label(item.appointment_status, "Patient Appointment") }}
 				</v-chip>
 			</template>
 			<template #item.queue="{ item }">
 				<span v-if="item.queue">{{ item.queue }}</span>
 				<v-btn
-					v-else-if="item.docstatus === 1 && item.appointment_date === today && item.appointment_status !== 'ملغي'"
+					v-else-if="item.docstatus === 1 && item.appointment_date === today && item.appointment_status !== AppointmentStatus.CANCELLED"
 					size="small"
 					variant="tonal"
 					color="primary"
@@ -121,9 +124,9 @@
 		:title="__('Confirm & Pay')"
 		:outstanding="payTarget.outstanding_amount"
 		:currency="payTarget.currency"
-		method="pay_appointment"
+		method="appointments.pay_appointment"
 		:extra-args="{ name: payTarget.name }"
-		:require-full="payTarget.appointment_type === 'كشف'"
+		:require-full="payTarget.appointment_type === AppointmentType.CONSULTATION"
 		:modes="cashierModes"
 		@paid="load"
 	/>
@@ -132,7 +135,13 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { call, notifySuccess, printDoc, searchLinkOptions } from "../client.js";
-import { APPOINTMENT_STATUS, appointmentStatusColor } from "../constants.js";
+import {
+	APPOINTMENT_STATUS,
+	AppointmentStatus,
+	AppointmentType,
+	appointmentStatusColor,
+	label,
+} from "../constants.js";
 import { useUiStore } from "../stores/ui.js";
 import NewAppointmentForm from "../components/NewAppointmentForm.vue";
 import NewSessionDialog from "../components/NewSessionDialog.vue";
@@ -193,7 +202,7 @@ async function searchEmployees(txt) {
 async function load() {
 	loading.value = true;
 	try {
-		rows.value = await call("get_appointments", { ...filters });
+		rows.value = await call("appointments.get_appointments", { ...filters });
 	} finally {
 		loading.value = false;
 	}
@@ -204,11 +213,11 @@ function view(name) {
 }
 
 // Ensure the invoice exists (the "confirm" step), then open the pay dialog with its totals.
-// The appointment type rides along so كشف can require full payment in the dialog.
+// The appointment type rides along so a consultation can require full payment in the dialog.
 async function confirmAndPay(item) {
 	confirming.value = item.name;
 	try {
-		const fin = await call("confirm_appointment_invoice", { name: item.name });
+		const fin = await call("appointments.confirm_appointment_invoice", { name: item.name });
 		payTarget.value = { name: item.name, appointment_type: item.appointment_type, ...fin };
 		payOpen.value = true;
 	} finally {
@@ -241,7 +250,7 @@ function onCreated() {
 async function checkIn(name) {
 	checkingIn.value = name;
 	try {
-		const q = await call("check_in", { appointment: name });
+		const q = await call("appointments.check_in", { appointment: name });
 		notifySuccess(__("Checked in — queue {0}", [q]));
 		await load();
 	} finally {

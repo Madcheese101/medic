@@ -114,7 +114,7 @@ const props = defineProps({
 	outstanding: { type: Number, default: 0 },
 	currency: { type: String, default: null },
 	// The whitelisted method (receives a `payments` list) plus the fixed args identifying the target.
-	method: { type: String, default: "record_payments" },
+	method: { type: String, default: "billing.record_payments" },
 	extraArgs: { type: Object, default: () => ({}) },
 	// Actions must be paid in full; other invoices allow a partial total.
 	requireFull: { type: Boolean, default: false },
@@ -199,7 +199,7 @@ function removeRow(i) {
 }
 
 async function loadModes() {
-	modes.value = await call("get_payment_modes");
+	modes.value = await call("billing.get_payment_modes");
 }
 
 async function submit() {

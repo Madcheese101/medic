@@ -172,7 +172,7 @@ async function save() {
 	try {
 		// Prop customer (Patient view) wins; else the in-form picker (standalone view).
 		const customer = props.customer || model.customer;
-		const name = await call("create_treatment_plan", { ...model, customer });
+		const name = await call("treatments.create_treatment_plan", { ...model, customer });
 		notifySuccess(__("Treatment plan {0} created", [name]));
 		open.value = false;
 		emit("created");

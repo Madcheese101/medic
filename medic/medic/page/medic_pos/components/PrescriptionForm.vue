@@ -227,13 +227,13 @@ async function save() {
 	saving.value = true;
 	try {
 		if (isNew.value) {
-			const name = await call("create_prescription", {
+			const name = await call("appointments.create_prescription", {
 				appointment: props.appointment,
 				items: rows.value,
 			});
 			notifySuccess(__("Prescription {0} created", [name]));
 		} else {
-			await call("update_prescription", { name: props.prescription, items: rows.value });
+			await call("appointments.update_prescription", { name: props.prescription, items: rows.value });
 			notifySuccess(__("Prescription saved"));
 		}
 		emit("saved");
@@ -248,7 +248,7 @@ onMounted(async () => {
 
 	loading.value = true;
 	try {
-		const doc = await call("get_prescription", { name: props.prescription });
+		const doc = await call("appointments.get_prescription", { name: props.prescription });
 		rows.value = doc.items || [];
 		postingDate.value = doc.posting_date;
 		invoiceCreated.value = !!doc.invoice_created;

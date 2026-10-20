@@ -135,7 +135,7 @@
 						<td>{{ formatDate(s.appointment_date) }}</td>
 						<td>
 							<v-chip size="x-small" variant="tonal" :color="appointmentStatusColor(s.appointment_status)">
-								{{ s.appointment_status || "—" }}
+								{{ label(s.appointment_status, "Patient Appointment") }}
 							</v-chip>
 						</td>
 						<td>{{ s.queue || "—" }}</td>
@@ -196,7 +196,7 @@
 	<DiscountDialog
 		v-model="discountOpen"
 		:current="plan.discount_percentage"
-		method="set_treatment_plan_discount"
+		method="treatments.set_treatment_plan_discount"
 		:extra-args="{ name: props.name }"
 		@saved="load"
 	/>
@@ -206,7 +206,7 @@
 		:title="__('Add Payment')"
 		:outstanding="plan.outstanding_amount"
 		:currency="plan.currency"
-		method="record_payments"
+		method="billing.record_payments"
 		:extra-args="{ invoice: plan.invoice }"
 		@paid="load"
 	/>
@@ -216,7 +216,7 @@
 		:title="__('Create Invoice & Collect Deposit')"
 		:outstanding="plan.estimated_total"
 		:currency="plan.currency"
-		method="create_treatment_plan_invoice"
+		method="treatments.create_treatment_plan_invoice"
 		:extra-args="{ name: props.name }"
 		:modes="cashierModes"
 		@paid="load"
@@ -227,12 +227,13 @@
 import { computed, onMounted, ref } from "vue";
 import { useRtl } from "vuetify";
 import { call, formatCurrency, notifySuccess, printDoc } from "../client.js";
-import { appointmentStatusColor, treatmentStatusColor } from "../constants.js";
+import { appointmentStatusColor, label, treatmentStatusColor } from "../constants.js";
 import SplitPaymentDialog from "../components/SplitPaymentDialog.vue";
 import DoctorDatePicker from "../components/DoctorDatePicker.vue";
 import DiscountDialog from "../components/DiscountDialog.vue";
 import ReferenceField from "../components/ReferenceField.vue";
 import { useReferences } from "../references.js";
+import { hasDiscountRole } from "../discount.js";
 
 const props = defineProps({ name: { type: String, default: null } });
 const emit = defineEmits(["back"]);
@@ -261,7 +262,7 @@ const canDiscount = computed(
 	() =>
 		!plan.value.invoice &&
 		["Pending", "Active"].includes(plan.value.status) &&
-		["Doctor", "Cashier"].some((r) => frappe.user_roles.includes(r))
+		hasDiscountRole()
 );
 const paidPct = computed(() => (plan.value.paid_pct || 0) * 100);
 
@@ -272,7 +273,7 @@ function formatDate(value) {
 async function load() {
 	loading.value = true;
 	try {
-		plan.value = await call("get_treatment_plan", { name: props.name });
+		plan.value = await call("treatments.get_treatment_plan", { name: props.name });
 	} finally {
 		loading.value = false;
 	}
@@ -281,7 +282,7 @@ async function load() {
 async function addSession() {
 	addingSession.value = true;
 	try {
-		await call("create_session", { treatment_plan: props.name, appointment_date: sessionDate.value });
+		await call("treatments.create_session", { treatment_plan: props.name, appointment_date: sessionDate.value });
 		notifySuccess(__("Session added"));
 		sessionDate.value = null;
 		await load();
@@ -298,7 +299,7 @@ function openExtraSessions() {
 async function addExtraSessions() {
 	addingExtra.value = true;
 	try {
-		await call("add_treatment_sessions", { name: props.name, sessions: extraSessions.value });
+		await call("treatments.add_treatment_sessions", { name: props.name, sessions: extraSessions.value });
 		notifySuccess(__("Sessions added"));
 		extraOpen.value = false;
 		await load();
@@ -310,7 +311,7 @@ async function addExtraSessions() {
 async function checkIn(appointment) {
 	checkingIn.value = appointment;
 	try {
-		const q = await call("check_in", { appointment });
+		const q = await call("appointments.check_in", { appointment });
 		notifySuccess(__("Checked in — queue {0}", [q]));
 		await load();
 	} finally {

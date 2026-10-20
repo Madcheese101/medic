@@ -87,7 +87,7 @@ async function load() {
 	try {
 		// The API takes the employee from the client, so the store must be resolved first.
 		await defaultsStore.load();
-		const doc = await call("get_my_schedule", { employee: defaultsStore.employee });
+		const doc = await call("profile.get_my_schedule", { employee: defaultsStore.employee });
 		doctorName.value = doc?.employee_name || null;
 		rows.value = (doc?.schedule || []).map((r) => ({
 			day: r.day,
@@ -104,7 +104,7 @@ async function load() {
 async function save() {
 	saving.value = true;
 	try {
-		await call("save_schedule", {
+		await call("profile.save_schedule", {
 			rows: JSON.stringify(rows.value),
 			employee: defaultsStore.employee,
 		});

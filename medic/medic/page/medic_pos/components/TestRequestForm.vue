@@ -192,7 +192,7 @@ async function create() {
 
 	saving.value = true;
 	try {
-		const name = await call("create_appointment_test_request", {
+		const name = await call("appointments.create_appointment_test_request", {
 			appointment: props.appointment,
 			items: newItems.value,
 		});
@@ -206,7 +206,7 @@ async function create() {
 async function reload() {
 	loading.value = true;
 	try {
-		const data = await call("get_test_request", { name: props.testRequest });
+		const data = await call("lab.get_test_request", { name: props.testRequest });
 		doc.value = data;
 		results.value = (data.result || []).map((r) => ({ ...r }));
 	} finally {
@@ -217,7 +217,7 @@ async function reload() {
 async function saveResults() {
 	savingResults.value = true;
 	try {
-		const data = await call("save_test_results", {
+		const data = await call("lab.save_test_results", {
 			name: props.testRequest,
 			results: results.value.map((r) => ({ item: r.item, result: r.result })),
 		});
@@ -233,7 +233,7 @@ async function startTest() {
 	if (!(await confirmAction(__("Start this test?")))) return;
 	acting.value = true;
 	try {
-		await call("start_test_request", { name: props.testRequest });
+		await call("lab.start_test_request", { name: props.testRequest });
 		await reload();
 	} finally {
 		acting.value = false;
@@ -253,7 +253,7 @@ async function completeTest() {
 	if (!(await confirmAction(__("Mark this test as completed?")))) return;
 	acting.value = true;
 	try {
-		await call("complete_test_request", { name: props.testRequest });
+		await call("lab.complete_test_request", { name: props.testRequest });
 		notifySuccess(__("Test completed"));
 		await reload();
 	} finally {

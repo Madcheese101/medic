@@ -109,7 +109,7 @@ function pickImage() {
 async function load() {
 	loading.value = true;
 	try {
-		const data = await call("get_my_profile");
+		const data = await call("profile.get_my_profile");
 		Object.assign(model, {
 			name: data.name,
 			full_name: data.full_name,
@@ -131,7 +131,7 @@ async function save() {
 
 	saving.value = true;
 	try {
-		await call("save_profile", {
+		await call("profile.save_profile", {
 			language: model.language,
 			user_image: model.user_image,
 			new_password: password.new_password || null,

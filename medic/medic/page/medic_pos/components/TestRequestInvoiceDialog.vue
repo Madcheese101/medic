@@ -61,7 +61,7 @@ const selected = computed(() => rows.value.filter((r) => r.checked).map((r) => r
 async function loadItems() {
 	loading.value = true;
 	try {
-		const data = await call("get_test_request", { name: props.name });
+		const data = await call("lab.get_test_request", { name: props.name });
 		// All items checked by default; the user unchecks any to exclude them.
 		rows.value = (data.items || []).map((it) => ({ item: it.item, item_name: it.item_name, checked: true }));
 	} finally {
@@ -72,7 +72,7 @@ async function loadItems() {
 async function create() {
 	saving.value = true;
 	try {
-		const invoice = await call("create_test_request_invoice", { name: props.name, items: selected.value });
+		const invoice = await call("lab.create_test_request_invoice", { name: props.name, items: selected.value });
 		notifySuccess(__("Draft invoice {0} created", [invoice]));
 		open.value = false;
 		emit("created", invoice);

@@ -117,7 +117,7 @@ async function searchCustomers(txt) {
 async function load() {
 	loading.value = true;
 	try {
-		rows.value = await call("list_test_requests", { ...filters });
+		rows.value = await call("lab.list_test_requests", { ...filters });
 	} finally {
 		loading.value = false;
 	}

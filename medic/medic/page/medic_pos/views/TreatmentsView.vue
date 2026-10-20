@@ -94,7 +94,7 @@
 		:title="__('Create Invoice & Collect Deposit')"
 		:outstanding="depositTarget.estimated_total"
 		:currency="depositTarget.currency"
-		method="create_treatment_plan_invoice"
+		method="treatments.create_treatment_plan_invoice"
 		:extra-args="{ name: depositTarget.name }"
 		:modes="cashierModes"
 		@paid="load"
@@ -149,7 +149,7 @@ async function searchEmployees(txt) {
 async function load() {
 	loading.value = true;
 	try {
-		rows.value = await call("list_treatment_plans", { ...filters });
+		rows.value = await call("treatments.list_treatment_plans", { ...filters });
 	} finally {
 		loading.value = false;
 	}

@@ -93,7 +93,7 @@ function formatDate(value) {
 async function load() {
 	loading.value = true;
 	try {
-		rows.value = await call("get_patients", { ...filters });
+		rows.value = await call("patients.get_patients", { ...filters });
 	} finally {
 		loading.value = false;
 	}

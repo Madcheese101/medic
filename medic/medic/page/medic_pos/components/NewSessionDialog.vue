@@ -91,7 +91,7 @@ async function loadPlans() {
 	if (!customer.value) return;
 	loadingPlans.value = true;
 	try {
-		const plans = await call("get_active_treatment_plans", { customer: customer.value });
+		const plans = await call("treatments.get_active_treatment_plans", { customer: customer.value });
 		planItems.value = plans.map((p) => ({
 			title: `${p.name} · ${p.service_name || p.service} (${p.completed_sessions || 0}/${p.total_sessions})`,
 			value: p.name,
@@ -106,7 +106,7 @@ async function loadPlans() {
 async function save() {
 	saving.value = true;
 	try {
-		const name = await call("create_session", {
+		const name = await call("treatments.create_session", {
 			treatment_plan: plan.value,
 			appointment_date: sessionDate.value,
 		});

@@ -3,7 +3,7 @@
 		<v-card>
 			<v-card-title class="d-flex align-center">
 				<v-icon icon="mdi-medical-bag" class="mr-2" />
-				{{ __("New Action") }}<span v-if="actionType" class="ml-1">— {{ actionType }}</span>
+				{{ __("New Action") }}<span v-if="actionType" class="ml-1">— {{ label(actionType, "Appointment Actions") }}</span>
 			</v-card-title>
 			<v-divider />
 			<v-card-text>
@@ -66,6 +66,7 @@ import { computed, reactive, ref, watch } from "vue";
 import { useDisplay } from "vuetify";
 import { call, notifySuccess, searchLinkOptions } from "../client.js";
 import { canDiscount, discountRule, maxDiscount } from "../discount.js";
+import { ActionType, label } from "../constants.js";
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -85,7 +86,7 @@ const form = ref(null);
 const saving = ref(false);
 const options = reactive({ service_type: [], service: [] });
 const model = reactive({ service_type: null, service: null, discount_percentage: null });
-const showDiscount = computed(() => canDiscount() && props.actionType === "علاج");
+const showDiscount = computed(() => canDiscount() && props.actionType === ActionType.TREATMENT);
 
 const required = (value) => !!value || __("Required");
 
@@ -119,7 +120,7 @@ async function save() {
 
 	saving.value = true;
 	try {
-		await call("create_appointment_action", {
+		await call("appointments.create_appointment_action", {
 			name: props.appointment,
 			service: model.service,
 			action_type: props.actionType,

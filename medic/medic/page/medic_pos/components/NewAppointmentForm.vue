@@ -190,7 +190,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRtl } from "vuetify";
 import { call, customSearchLink, notifySuccess, searchLinkOptions } from "../client.js";
-import { APPOINTMENT_TYPES, BLOOD_TYPES } from "../constants.js";
+import { APPOINTMENT_TYPES, AppointmentType, BLOOD_TYPES } from "../constants.js";
 import DoctorDatePicker from "./DoctorDatePicker.vue";
 import { canDiscount, discountRule, maxDiscount } from "../discount.js";
 
@@ -229,8 +229,8 @@ const appt = reactive({
 	notes: "",
 	discount_percentage: null,
 });
-// كشف, مراجعة and متابعة دورية are never discounted.
-const showDiscount = computed(() => canDiscount() && appt.appointment_type === "علاج");
+// Consultations, reviews and follow-ups are never discounted.
+const showDiscount = computed(() => canDiscount() && appt.appointment_type === AppointmentType.TREATMENT);
 
 const options = reactive({ customer: [], employee: [], service_type: [], service: [] });
 
@@ -282,10 +282,10 @@ async function save() {
 		// A brand-new patient is created first; its Customer id becomes the appointment's customer.
 		let customerId = customer.value;
 		if (isNew.value) {
-			customerId = await call("create_patient", { ...patient });
+			customerId = await call("patients.create_patient", { ...patient });
 			notifySuccess(__("Patient {0} created", [customerId]));
 		}
-		const name = await call("create_appointment", {
+		const name = await call("appointments.create_appointment", {
 			...appt,
 			customer: customerId,
 			discount_percentage: showDiscount.value ? appt.discount_percentage : null,

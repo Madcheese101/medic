@@ -92,14 +92,14 @@
 			<IllnessTable
 				v-model="history.medical_history"
 				:label="__('Medical History')"
-				:illness-type="GENERAL_ILLNESS"
+				:illness-type="IllnessType.OTHER"
 				class="mb-5"
 			/>
 
 			<IllnessTable
 				v-model="history.skin_illness"
 				:label="__('Skin Illness')"
-				:illness-type="SKIN_ILLNESS"
+				:illness-type="IllnessType.SKIN"
 			/>
 
 			<div class="d-flex mt-3">
@@ -120,13 +120,10 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRtl } from "vuetify";
 import { call, customSearchLink, formatCurrency, notifySuccess } from "../client.js";
-import { BLOOD_TYPES } from "../constants.js";
+import { BLOOD_TYPES, IllnessType } from "../constants.js";
 import IllnessTable from "../components/IllnessTable.vue";
 import PatientTreatments from "../components/PatientTreatments.vue";
 
-// Illness.illness_type options, as defined on the Illness doctype.
-const GENERAL_ILLNESS = "أخرى";
-const SKIN_ILLNESS = "جلدي";
 
 const props = defineProps({ patient: { type: String, default: null } });
 const emit = defineEmits(["back"]);
@@ -169,7 +166,7 @@ async function searchGenders(txt) {
 async function load() {
 	loading.value = true;
 	try {
-		const data = await call("get_patient", { name: props.patient });
+		const data = await call("patients.get_patient", { name: props.patient });
 		Object.assign(model, data.customer);
 		balance.value = data.balance;
 		currency.value = data.currency;
@@ -191,7 +188,7 @@ async function savePatient() {
 
 	savingPatient.value = true;
 	try {
-		await call("save_patient", { name: props.patient, ...model });
+		await call("patients.save_patient", { name: props.patient, ...model });
 		notifySuccess(__("Patient saved"));
 	} finally {
 		savingPatient.value = false;
@@ -201,7 +198,7 @@ async function savePatient() {
 async function saveHistory() {
 	savingHistory.value = true;
 	try {
-		await call("save_medical_history", {
+		await call("patients.save_medical_history", {
 			customer: props.patient,
 			notes: history.notes,
 			medical_history: JSON.stringify(history.medical_history),

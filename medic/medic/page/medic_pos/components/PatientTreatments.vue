@@ -60,7 +60,7 @@ async function load() {
 	if (!props.customer) return;
 	loading.value = true;
 	try {
-		plans.value = await call("get_treatment_plans", { customer: props.customer });
+		plans.value = await call("treatments.get_treatment_plans", { customer: props.customer });
 	} finally {
 		loading.value = false;
 	}

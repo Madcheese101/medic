@@ -162,7 +162,7 @@
 			:title="__('Pay remaining')"
 			:outstanding="info ? info.shortfall : 0"
 			:currency="info ? info.currency : null"
-			method="record_payments"
+			method="billing.record_payments"
 			:extra-args="{ invoice }"
 			require-full
 			@paid="onRemainingPaid"
@@ -236,7 +236,7 @@ function removeRow(i) {
 async function loadInfo() {
 	loading.value = true;
 	try {
-		info.value = await call("get_invoice_return_info", { invoice: props.invoice });
+		info.value = await call("billing.get_invoice_return_info", { invoice: props.invoice });
 		amount.value = info.value.kind === "appointment" ? info.value.max_refund : null;
 		resetRows();
 	} finally {
@@ -259,7 +259,7 @@ async function submit() {
 
 	submitting.value = true;
 	try {
-		await call("create_invoice_return", {
+		await call("billing.create_invoice_return", {
 			invoice: props.invoice,
 			amount: refundAmount.value,
 			payments: rows.value.map((r) => ({
@@ -282,7 +282,7 @@ watch(open, async (isOpen) => {
 	info.value = null;
 	// Refunds are paid out in company currency only.
 	if (!modes.value.length)
-		modes.value = (await call("get_payment_modes")).filter(
+		modes.value = (await call("billing.get_payment_modes")).filter(
 			(m) => !m.currency || m.currency === frappe.boot.sysdefaults.currency
 		);
 	await loadInfo();

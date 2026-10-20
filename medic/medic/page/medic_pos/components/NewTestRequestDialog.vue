@@ -103,7 +103,7 @@ async function save() {
 	saving.value = true;
 	try {
 		const patient = props.customer || model.patient;
-		const name = await call("create_test_request", { patient, items: model.items });
+		const name = await call("lab.create_test_request", { patient, items: model.items });
 		notifySuccess(__("Test request {0} created", [name]));
 		open.value = false;
 		emit("created", name);

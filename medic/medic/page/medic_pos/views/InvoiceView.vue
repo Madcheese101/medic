@@ -123,7 +123,7 @@
 		:title="__('Pay')"
 		:outstanding="doc.outstanding_amount"
 		:currency="doc.currency"
-		method="pay_appointment_action"
+		method="appointments.pay_appointment_action"
 		:extra-args="{ invoice: doc.name }"
 		require-full
 		@paid="load"
@@ -132,7 +132,7 @@
 	<DiscountDialog
 		v-model="discountOpen"
 		:current="doc.discount_percentage"
-		method="set_invoice_discount"
+		method="billing.set_invoice_discount"
 		:extra-args="{ invoice: doc.name }"
 		@saved="load"
 	/>
@@ -150,6 +150,7 @@ import ReferenceField from "../components/ReferenceField.vue";
 import ReturnInvoiceDialog from "../components/ReturnInvoiceDialog.vue";
 import DiscountDialog from "../components/DiscountDialog.vue";
 import { useReferences } from "../references.js";
+import { hasDiscountRole } from "../discount.js";
 
 const props = defineProps({ name: { type: String, default: null } });
 const emit = defineEmits(["back"]);
@@ -172,9 +173,9 @@ const canReturn = computed(() => {
 	return !!d.patient_appointment && !d.is_action_invoice && Number(d.outstanding_amount) < Number(d.grand_total);
 });
 
-// Draft invoices other than كشف/مراجعة/متابعة دورية only, for doctors and cashiers; the server re-checks.
+// Draft invoices other than consultation/review/follow-up ones, for doctors and cashiers; the server re-checks.
 const canDiscount = computed(
-	() => !!doc.value.can_discount && ["Doctor", "Cashier"].some((r) => frappe.user_roles.includes(r))
+	() => !!doc.value.can_discount && hasDiscountRole()
 );
 
 function formatDate(value) {
@@ -184,7 +185,7 @@ function formatDate(value) {
 async function load() {
 	loading.value = true;
 	try {
-		doc.value = await call("get_sales_invoice", { name: props.name });
+		doc.value = await call("billing.get_sales_invoice", { name: props.name });
 	} finally {
 		loading.value = false;
 	}

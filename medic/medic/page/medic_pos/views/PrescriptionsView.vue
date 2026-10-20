@@ -128,7 +128,7 @@ async function searchCustomers(txt) {
 async function load() {
 	loading.value = true;
 	try {
-		rows.value = await call("list_prescriptions", {
+		rows.value = await call("pos.list_prescriptions", {
 			customer: filters.customer,
 			mobile: filters.mobile,
 			include_invoiced: filters.include_invoiced ? 1 : 0,

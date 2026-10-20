@@ -78,7 +78,7 @@ async function loadAvailability() {
 		todayStr.value = null;
 		return;
 	}
-	const res = await call("get_doctor_availability", { employee: props.employee });
+	const res = await call("appointments.get_doctor_availability", { employee: props.employee });
 	weekdayMax.value = res.weekday_max || {};
 	booked.value = res.booked || {};
 	todayStr.value = res.today;

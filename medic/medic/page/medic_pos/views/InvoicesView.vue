@@ -107,7 +107,7 @@
 		:title="__('Add Payment')"
 		:outstanding="payTarget.outstanding_amount"
 		:currency="payTarget.currency"
-		method="record_payments"
+		method="billing.record_payments"
 		:extra-args="{ invoice: payTarget.name }"
 		@paid="load"
 	/>
@@ -117,7 +117,7 @@
 		:title="__('Pay')"
 		:outstanding="payActionTarget.outstanding_amount"
 		:currency="payActionTarget.currency"
-		method="pay_appointment_action"
+		method="appointments.pay_appointment_action"
 		:extra-args="{ invoice: payActionTarget.name }"
 		require-full
 		@paid="load"
@@ -164,7 +164,7 @@ async function searchCustomers(txt) {
 async function load() {
 	loading.value = true;
 	try {
-		rows.value = await call("get_sales_invoices", { ...filters });
+		rows.value = await call("billing.get_sales_invoices", { ...filters });
 	} finally {
 		loading.value = false;
 	}

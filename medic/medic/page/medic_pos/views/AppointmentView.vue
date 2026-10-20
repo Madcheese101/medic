@@ -35,9 +35,9 @@
 				<v-list density="comfortable">
 					<v-list-item
 						v-for="t in ACTION_TYPES"
-						:key="t"
-						:title="t"
-						@click="openAction(t)"
+						:key="t.value"
+						:title="t.title"
+						@click="openAction(t.value)"
 					/>
 				</v-list>
 			</v-menu>
@@ -45,7 +45,7 @@
 				{{ __("Cancelled") }}
 			</v-chip>
 			<v-chip v-else :color="appointmentStatusColor(doc.appointment_status)" variant="flat" size="large">
-				{{ doc.appointment_status || "—" }}
+				{{ label(doc.appointment_status, "Patient Appointment") }}
 			</v-chip>
 		</v-card-title>
 		<v-divider />
@@ -54,7 +54,7 @@
 			<div class="text-subtitle-2 text-medium-emphasis mb-2">{{ __("Appointment Details") }}</div>
 			<v-row dense>
 				<v-col cols="12" md="6">
-					<v-text-field :model-value="doc.appointment_type" :label="__('Appointment Type')" prepend-inner-icon="mdi-clipboard-text-outline" readonly />
+					<v-text-field :model-value="label(doc.appointment_type, 'Patient Appointment')" :label="__('Appointment Type')" prepend-inner-icon="mdi-clipboard-text-outline" readonly />
 				</v-col>
 				<v-col cols="12" md="6">
 					<v-text-field :model-value="formatDate(doc.appointment_date)" :label="__('Appointment Date')" prepend-inner-icon="mdi-calendar" readonly />
@@ -151,13 +151,13 @@
 					<tr v-for="(row, i) in doc.actions" :key="i">
 						<td>{{ row.invoice }}</td>
 						<td>{{ row.invoice_type }}</td>
-						<td>{{ row.action_type }}</td>
+						<td>{{ label(row.action_type, "Appointment Actions") }}</td>
 						<td>
 							<v-icon :icon="row.paid ? 'mdi-check-circle' : 'mdi-close-circle-outline'" :color="row.paid ? 'success' : 'medium-emphasis'" />
 						</td>
 						<td class="text-end">
 							<v-btn
-								v-if="row.action_type === 'علاج' && !row.paid"
+								v-if="row.action_type === ActionType.TREATMENT && !row.paid"
 								size="small"
 								variant="tonal"
 								color="primary"
@@ -167,7 +167,7 @@
 								{{ __("Confirm & Pay") }}
 							</v-btn>
 							<v-btn
-								v-if="row.action_type === 'وصفة طبية'"
+								v-if="row.action_type === ActionType.PRESCRIPTION"
 								size="small"
 								variant="tonal"
 								color="primary"
@@ -227,7 +227,7 @@
 		:title="__('Confirm & Pay')"
 		:outstanding="payTarget.outstanding_amount"
 		:currency="payTarget.currency"
-		method="pay_appointment_action"
+		method="appointments.pay_appointment_action"
 		:extra-args="{ invoice: payTarget.invoice }"
 		require-full
 		@paid="load"
@@ -238,7 +238,13 @@
 import { computed, onMounted, ref } from "vue";
 import { useRtl } from "vuetify";
 import { call, confirmAction, notifySuccess, printDoc } from "../client.js";
-import { ACTION_TYPES, appointmentStatusColor } from "../constants.js";
+import {
+	ACTION_TYPES,
+	ActionType,
+	AppointmentStatus,
+	appointmentStatusColor,
+	label,
+} from "../constants.js";
 import AppointmentActionDialog from "../components/AppointmentActionDialog.vue";
 import PrescriptionForm from "../components/PrescriptionForm.vue";
 import TestRequestForm from "../components/TestRequestForm.vue";
@@ -274,10 +280,10 @@ const isCancelled = computed(() => doc.value.docstatus === 2);
 // Treatment-plan sessions are confirmed and checked in from the plan, not here.
 const isTreatmentSession = computed(() => !!doc.value.treatment_plan);
 // Completed is terminal: it disables every other action.
-const isCompleted = computed(() => doc.value.appointment_status === "مكتمل");
+const isCompleted = computed(() => doc.value.appointment_status === AppointmentStatus.COMPLETED);
 // Confirm is only reachable on a submitted, still-pending, non-plan appointment.
 const canConfirm = computed(
-	() => doc.value.docstatus === 1 && doc.value.appointment_status === "انتظار" && !isTreatmentSession.value
+	() => doc.value.docstatus === 1 && doc.value.appointment_status === AppointmentStatus.PENDING && !isTreatmentSession.value
 );
 // Check-in assigns the queue; available once submitted, not yet queued, and only on the appointment's own day.
 const canCheckIn = computed(
@@ -285,10 +291,10 @@ const canCheckIn = computed(
 		doc.value.docstatus === 1 &&
 		!doc.value.queue &&
 		!isTreatmentSession.value &&
-		doc.value.appointment_status !== "ملغي" &&
+		doc.value.appointment_status !== AppointmentStatus.CANCELLED &&
 		doc.value.appointment_date === frappe.datetime.get_today()
 );
-// Complete is offered once the patient has a queue number, until it is marked مكتمل.
+// Complete is offered once the patient has a queue number, until it is marked completed.
 const canComplete = computed(() => doc.value.docstatus === 1 && !!doc.value.queue && !isCompleted.value);
 
 function formatDate(value) {
@@ -298,7 +304,7 @@ function formatDate(value) {
 async function load() {
 	loading.value = true;
 	try {
-		const data = await call("get_appointment", { name: props.name });
+		const data = await call("appointments.get_appointment", { name: props.name });
 		doc.value = data;
 		doctorName.value = data.doctor_name || data.employee;
 		notes.value = data.notes || "";
@@ -313,7 +319,7 @@ async function confirm() {
 
 	confirming.value = true;
 	try {
-		await call("confirm_appointment", { name: props.name });
+		await call("appointments.confirm_appointment", { name: props.name });
 		notifySuccess(__("Appointment confirmed"));
 		await load();
 	} finally {
@@ -324,7 +330,7 @@ async function confirm() {
 async function checkIn() {
 	checkingIn.value = true;
 	try {
-		const q = await call("check_in", { appointment: props.name });
+		const q = await call("appointments.check_in", { appointment: props.name });
 		notifySuccess(__("Checked in — queue {0}", [q]));
 		await load();
 	} finally {
@@ -335,13 +341,13 @@ async function checkIn() {
 // The dropdown picks the action type; the dialog then only asks for the service.
 function openAction(actionType) {
 	// Prescriptions are not billable, so they get their own inline form instead of the invoice dialog.
-	if (actionType === "وصفة طبية") {
+	if (actionType === ActionType.PRESCRIPTION) {
 		openPrescription.value = null;
 		prescribing.value = true;
 		return;
 	}
 	// Lab actions open an inline Test Request form, mirroring the prescription flow.
-	if (actionType === "تحليل") {
+	if (actionType === ActionType.LAB_TEST) {
 		openTestRequest.value = null;
 		testing.value = true;
 		return;
@@ -374,7 +380,7 @@ async function closeTestRequest() {
 	await load();
 }
 
-// علاج actions are paid in full; the row carries its invoice totals from get_appointment.
+// Treatment actions are paid in full; the row carries its invoice totals from get_appointment.
 function payAction(row) {
 	payTarget.value = row;
 	payOpen.value = true;
@@ -386,7 +392,7 @@ async function complete() {
 
 	completing.value = true;
 	try {
-		await call("complete_appointment", { name: props.name });
+		await call("appointments.complete_appointment", { name: props.name });
 		notifySuccess(__("Appointment completed"));
 		await load();
 	} finally {
@@ -397,7 +403,7 @@ async function complete() {
 async function saveNotes() {
 	savingNotes.value = true;
 	try {
-		await call("save_appointment_notes", { name: props.name, notes: notes.value });
+		await call("appointments.save_appointment_notes", { name: props.name, notes: notes.value });
 		notifySuccess(__("Notes saved"));
 	} finally {
 		savingNotes.value = false;
