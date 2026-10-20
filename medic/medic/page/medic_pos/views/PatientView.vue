@@ -12,6 +12,16 @@
 			<v-btn color="primary" variant="tonal" prepend-icon="mdi-calendar-plus" @click="newAppointment">
 				{{ __("New Appointment") }}
 			</v-btn>
+			<v-btn
+				color="primary"
+				variant="flat"
+				prepend-icon="mdi-content-save-outline"
+				:disabled="!dirty"
+				:loading="saving"
+				@click="save"
+			>
+				{{ __("Save") }}
+			</v-btn>
 			<!-- An amount owed opens the invoices behind it. -->
 			<v-chip
 				v-if="balance !== null"
@@ -82,13 +92,6 @@
 				</v-row>
 			</v-form>
 
-			<div class="d-flex mt-3">
-				<v-spacer />
-				<v-btn color="primary" variant="flat" :loading="savingPatient" @click="savePatient">
-					{{ __("Save Patient") }}
-				</v-btn>
-			</div>
-
 			<v-divider class="my-5" />
 
 			<!-- Section order follows the Medical History doctype field_order. -->
@@ -115,13 +118,6 @@
 				:illness-type="IllnessType.SKIN"
 			/>
 
-			<div class="d-flex mt-3">
-				<v-spacer />
-				<v-btn color="primary" variant="flat" :loading="savingHistory" @click="saveHistory">
-					{{ __("Save Medical History") }}
-				</v-btn>
-			</div>
-
 			<v-divider class="my-5" />
 
 			<PatientRecords ref="records" :customer="props.patient" />
@@ -130,9 +126,17 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { onBeforeRouteLeave } from "vue-router";
 import { useRtl } from "vuetify";
-import { call, customSearchLink, debounce, formatCurrency, notifySuccess } from "../client.js";
+import {
+	call,
+	confirmAction,
+	customSearchLink,
+	debounce,
+	formatCurrency,
+	notifySuccess,
+} from "../client.js";
 import { BLOOD_TYPES, IllnessType } from "../constants.js";
 import { useUiStore } from "../stores/ui.js";
 import IllnessTable from "../components/IllnessTable.vue";
@@ -148,8 +152,7 @@ const { isRtl } = useRtl();
 const form = ref(null);
 const records = ref(null);
 const loading = ref(false);
-const savingPatient = ref(false);
-const savingHistory = ref(false);
+const saving = ref(false);
 const balance = ref(null);
 const currency = ref(null);
 const genders = ref([]);
@@ -162,6 +165,12 @@ const model = reactive({
 	blood_type: null,
 });
 const history = reactive({ notes: "", medical_history: [], skin_illness: [] });
+
+// The patient and their medical history as last loaded or saved, so unsaved edits show.
+const saved = reactive({ patient: JSON.stringify(model), history: JSON.stringify(history) });
+const patientDirty = computed(() => JSON.stringify(model) !== saved.patient);
+const historyDirty = computed(() => JSON.stringify(history) !== saved.history);
+const dirty = computed(() => patientDirty.value || historyDirty.value);
 
 const backIcon = computed(() => (isRtl.value ? "mdi-arrow-right" : "mdi-arrow-left"));
 
@@ -207,37 +216,42 @@ async function load() {
 		history.medical_history = mh?.medical_history || [];
 		history.skin_illness = mh?.skin_illness || [];
 
+		saved.patient = JSON.stringify(model);
+		saved.history = JSON.stringify(history);
 		searchGenders("");
 	} finally {
 		loading.value = false;
 	}
 }
 
-async function savePatient() {
-	const { valid } = await form.value.validate();
-	if (!valid) return;
+// One Save for the page: it saves the patient, the medical history, or both, whichever changed.
+async function save() {
+	if (patientDirty.value) {
+		const { valid } = await form.value.validate();
+		if (!valid) return;
+	}
 
-	savingPatient.value = true;
+	saving.value = true;
 	try {
-		await call("patients.save_patient", { name: props.patient, ...model });
+		// Snapshot before each call, so edits made while it runs still count as unsaved.
+		if (patientDirty.value) {
+			const snapshot = JSON.stringify(model);
+			await call("patients.save_patient", { name: props.patient, ...model });
+			saved.patient = snapshot;
+		}
+		if (historyDirty.value) {
+			const snapshot = JSON.stringify(history);
+			await call("patients.save_medical_history", {
+				customer: props.patient,
+				notes: history.notes,
+				medical_history: JSON.stringify(history.medical_history),
+				skin_illness: JSON.stringify(history.skin_illness),
+			});
+			saved.history = snapshot;
+		}
 		notifySuccess(__("Patient saved"));
 	} finally {
-		savingPatient.value = false;
-	}
-}
-
-async function saveHistory() {
-	savingHistory.value = true;
-	try {
-		await call("patients.save_medical_history", {
-			customer: props.patient,
-			notes: history.notes,
-			medical_history: JSON.stringify(history.medical_history),
-			skin_illness: JSON.stringify(history.skin_illness),
-		});
-		notifySuccess(__("Medical history saved"));
-	} finally {
-		savingHistory.value = false;
+		saving.value = false;
 	}
 }
 
@@ -247,5 +261,21 @@ function newAppointment() {
 	emit("navigate", "appointments");
 }
 
-onMounted(load);
+// Leaving the page, in the app or by closing the tab, asks before dropping unsaved edits.
+onBeforeRouteLeave(
+	() => !dirty.value || confirmAction(__("You have unsaved changes. Leave without saving?"))
+);
+
+function warnBeforeUnload(event) {
+	if (!dirty.value) return;
+	event.preventDefault();
+	event.returnValue = "";
+}
+
+onMounted(() => {
+	window.addEventListener("beforeunload", warnBeforeUnload);
+	load();
+});
+
+onUnmounted(() => window.removeEventListener("beforeunload", warnBeforeUnload));
 </script>
