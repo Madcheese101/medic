@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, createMemoryHistory } from "vue-router";
+import { createRouter, createWebHistory } from "vue-router";
 import PatientsView from "../views/PatientsView.vue";
 import PatientView from "../views/PatientView.vue";
 import AppointmentsView from "../views/AppointmentsView.vue";
@@ -138,7 +138,6 @@ const routes = [
 
 const router = createRouter({
 	history: createWebHistory(),
-	// abstract: createMemoryHistory(),
 	routes: routes,
 });
 
