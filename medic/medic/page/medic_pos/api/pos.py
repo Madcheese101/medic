@@ -40,7 +40,9 @@ def _pos_item_lines(profile, item_codes):
 	items = {
 		r.name: r
 		for r in frappe.get_all(
-			"Item", filters={"name": ["in", codes]}, fields=["name", "item_name", "stock_uom"]
+			"Item",
+			filters={"name": ["in", codes]},
+			fields=["name", "item_name", "stock_uom", "is_stock_item"],
 		)
 	}
 	stock = dict(
@@ -93,6 +95,7 @@ def _pos_item_lines(profile, item_codes):
 				"price_list_rate": rates[code],
 				"rate": rates[code],
 				"actual_qty": flt(stock.get(code)),
+				"is_stock_item": items[code].is_stock_item,
 				"uoms": item_uoms,
 			}
 		)
@@ -134,12 +137,18 @@ def pos_search_items(context, txt=""):
 		filters["item_group"] = cfg["item_group"]
 
 	or_filters = None
+	scanned = []
 	if txt:
 		or_filters = {"item_code": ["like", f"%{txt}%"], "item_name": ["like", f"%{txt}%"]}
+		# A scanned barcode is an exact match, so its item leads the results: Enter adds the first one.
+		scanned = frappe.get_all("Item Barcode", filters={"barcode": txt}, pluck="parent")
+		if scanned:
+			or_filters["name"] = ["in", scanned]
 
 	items = frappe.get_all(
 		"Item", filters=filters, or_filters=or_filters, pluck="name", limit=40, order_by="item_name asc"
 	)
+	items.sort(key=lambda code: code not in scanned)
 	return _pos_item_lines(profile, items)
 
 

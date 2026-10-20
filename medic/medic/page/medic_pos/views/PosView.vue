@@ -58,7 +58,13 @@
 						</thead>
 						<tbody>
 							<tr v-for="(line, i) in cart" :key="i">
-								<td>{{ line.item_name }}</td>
+								<td>
+									{{ line.item_name }}
+									<div v-if="shortOfStock(line)" class="text-caption text-error">
+										<v-icon icon="mdi-alert-outline" size="x-small" />
+										{{ __("Only {0} {1} in stock", [line.actual_qty, line.stock_uom]) }}
+									</div>
+								</td>
 								<td>
 									<v-select
 										v-model="line.uom"
@@ -79,6 +85,7 @@
 										density="compact"
 										variant="plain"
 										hide-details
+										:error="shortOfStock(line)"
 									/>
 								</td>
 								<td class="text-end">{{ formatCurrency(line.rate, ctx.currency) }}</td>
@@ -140,14 +147,18 @@
 		<v-col cols="12" md="5">
 			<v-card>
 				<v-card-text>
+					<!-- Enter, or a barcode scanner's trailing Enter, adds the top result. -->
 					<v-text-field
+						ref="searchField"
 						v-model="search"
-						:label="__('Search items')"
-						prepend-inner-icon="mdi-magnify"
+						:label="__('Search or scan items')"
+						prepend-inner-icon="mdi-barcode-scan"
 						clearable
+						autofocus
 						hide-details
 						class="mb-3"
 						@update:model-value="searchItems"
+						@keydown.enter="addFirst"
 					/>
 					<v-list
 						:loading="loadingItems"
@@ -217,6 +228,7 @@ const customer = ref(null);
 const customerOptions = ref([]);
 const items = ref([]);
 const search = ref("");
+const searchField = ref(null);
 const loadingItems = ref(false);
 const payOpen = ref(false);
 const printOnPay = ref(true);
@@ -226,6 +238,15 @@ const payModes = computed(() =>
 	(ctx.value?.payment_modes || []).map((m) => ({ name: m.mode_of_payment, type: m.type }))
 );
 const totalQty = computed(() => cart.value.reduce((s, l) => s + (Number(l.qty) || 0), 0));
+// Stock-UOM quantity of each item across the cart's lines, to compare with the warehouse stock.
+const stockNeeded = computed(() => {
+	const need = {};
+	for (const l of cart.value) {
+		const qty = (Number(l.qty) || 0) * (Number(l.conversion_factor) || 1);
+		need[l.item_code] = (need[l.item_code] || 0) + qty;
+	}
+	return need;
+});
 const netTotal = computed(() =>
 	Number(cart.value.reduce((s, l) => s + amount(l), 0).toFixed(2))
 );
@@ -246,20 +267,41 @@ function amount(line) {
 	return Number(((Number(line.qty) || 0) * (Number(line.rate) || 0)).toFixed(2));
 }
 
+function shortOfStock(line) {
+	return !!line.is_stock_item && stockNeeded.value[line.item_code] > Number(line.actual_qty || 0);
+}
+
 const searchCustomers = debounce(async (txt) => {
 	customerOptions.value = await searchLinkOptions("Customer", txt, {}, "customer_name");
 });
 
-async function onSearch() {
+// Only the latest search may fill the list; an earlier one can answer after it.
+let latestSearch = 0;
+
+async function loadItems() {
+	const request = ++latestSearch;
 	loadingItems.value = true;
 	try {
-		items.value = await call("pos.pos_search_items", { context, txt: search.value || "" });
+		const result = await call("pos.pos_search_items", { context, txt: search.value || "" });
+		if (request === latestSearch) items.value = result;
 	} finally {
-		loadingItems.value = false;
+		if (request === latestSearch) loadingItems.value = false;
 	}
 }
 
-const searchItems = debounce(onSearch);
+const searchItems = debounce(loadItems);
+
+// Search what was typed or scanned right away, add the top result (an exact barcode match
+// comes first), and clear the box for the next item.
+async function addFirst() {
+	if (!search.value) return;
+	searchItems.cancel();
+	await loadItems();
+	if (!items.value.length) return;
+	addToCart(items.value[0]);
+	search.value = "";
+	loadItems();
+}
 
 function addToCart(item) {
 	const existing = cart.value.find((l) => l.item_code === item.item_code && l.uom === item.uom);
@@ -268,6 +310,7 @@ function addToCart(item) {
 	} else {
 		cart.value.push({ ...item, uoms: [...item.uoms] });
 	}
+	searchField.value?.focus();
 }
 
 async function onUomChange(line, uom) {
@@ -306,6 +349,7 @@ function onPaid(result) {
 	if (printOnPay.value) printInvoice(lastInvoice.value);
 	clearCart();
 	if (props.prescription) emit("navigate", "pharmacy-prescriptions");
+	else searchField.value?.focus();
 }
 
 onMounted(async () => {
@@ -324,6 +368,6 @@ onMounted(async () => {
 		customer.value = ctx.value.customer;
 	}
 	searchCustomers("");
-	onSearch();
+	loadItems();
 });
 </script>

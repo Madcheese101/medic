@@ -2,7 +2,7 @@ import frappe
 from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry
 from frappe.utils import flt
 
-from medic.tests.utils import MedicTestCase, call
+from medic.tests.utils import P, MedicTestCase, _item, call
 
 
 class TestLabTests(MedicTestCase):
@@ -81,7 +81,22 @@ class TestPharmacy(MedicTestCase):
 		self.assertEqual(line["price_list_rate"], 5)
 		self.assertEqual(line["actual_qty"], self.stock())
 		self.assertGreater(line["actual_qty"], 0)
+		self.assertEqual(line["is_stock_item"], 1)
 		self.assertEqual([u["uom"] for u in line["uoms"]], ["Nos"])
+
+	def test_scanned_barcode_leads_the_results(self):
+		barcode = frappe.generate_hash(length=10)
+		item = frappe.get_doc("Item", self.fx.drug)
+		item.append("barcodes", {"barcode": barcode})
+		# Like the fixtures, ignore mandatory custom fields a site may add to Item.
+		item.flags.ignore_mandatory = True
+		item.save()
+		# Named after the barcode, so it matches too and would sort first by name.
+		group = frappe.db.get_value("Item", self.fx.drug, "item_group")
+		other = _item(f"{P} Aspirin {barcode}", group, 5, self.fx.price_list)
+
+		lines = call("pos.pos_search_items", context="pharmacy", txt=barcode)
+		self.assertEqual([line["item_code"] for line in lines], [self.fx.drug, other])
 
 	def test_prescription_checkout(self):
 		appointment, _ = self.make_paid_appointment()
