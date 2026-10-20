@@ -133,7 +133,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useDisplay } from "vuetify";
 import { useDefaultsStore } from "./stores/defaults.js";
@@ -217,13 +217,7 @@ watch(
 );
 
 onMounted(() => {
-	// Scope the z-index override (below) to this page only.
-	document.body.classList.add("medic-pos-active");
 	defaultsStore.load();
-});
-
-onBeforeUnmount(() => {
-	document.body.classList.remove("medic-pos-active");
 });
 </script>
 
@@ -250,7 +244,8 @@ onBeforeUnmount(() => {
 }
 
 /* Frappe's native modals (frappe.confirm / msgprint) are Bootstrap dialogs that
-   sit below Vuetify's overlays. Lift them above so confirmations are visible. */
+   sit below Vuetify's overlays. Lift them above so confirmations are visible.
+   medic_pos.js sets the body class only while this page is shown. */
 body.medic-pos-active .modal-backdrop {
 	z-index: 2600 !important;
 }

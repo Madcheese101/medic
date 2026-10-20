@@ -1,0 +1,7 @@
+/* The Vue app draws its own app bar and navigation, so hide the desk's while it is shown.
+   medic_pos.js toggles the body class on page show/hide. */
+body.medic-pos-active .sticky-top,
+body.medic-pos-active .body-sidebar,
+body.medic-pos-active .body-sidebar-container {
+	display: none !important;
+}

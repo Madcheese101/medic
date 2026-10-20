@@ -17,5 +17,15 @@ frappe.pages['medic-pos'].on_page_load = function (wrapper) {
 		);
 	});
 
-	this.page.$MedicPos = new frappe.MedicPos.Controller(this.page);
+	// The SPA replaces the desk chrome only while this page is shown (see medic_pos.css).
+	$(wrapper).on("hide", () => document.body.classList.remove("medic-pos-active"));
+
+	// Loaded here rather than in hooks.py, so other desk pages don't download the Vue app.
+	frappe.require("medic-pos.bundle.js", () => {
+		this.page.$MedicPos = new frappe.MedicPos.Controller(this.page);
+	});
+};
+
+frappe.pages['medic-pos'].on_page_show = function () {
+	document.body.classList.add("medic-pos-active");
 };

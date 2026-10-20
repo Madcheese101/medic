@@ -16,11 +16,6 @@ frappe.MedicPos.Controller = class {
 	}
 
 	mount() {
-		$(".sticky-top").remove();
-		$(".body-sidebar").remove();
-		$(".body-sidebar-container").remove();
-		$(".body-sidebar-container").removeClass("expanded");
-
 		const medicLight = {
 			dark: false,
 			colors: {
