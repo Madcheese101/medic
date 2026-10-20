@@ -92,6 +92,10 @@ class TestPharmacy(MedicTestCase):
 			items=[{"item": self.fx.drug, "route": "Oral", "times": 2, "per": "Day", "for": 5}],
 		)
 
+		listed = call("pos.list_prescriptions", customer=patient)
+		self.assertEqual(listed["total"], 1)
+		self.assertEqual(listed["rows"][0]["appointment"], appointment)
+
 		cart = call("pos.get_prescription_cart", context="pharmacy", prescription=prescription)
 		self.assertEqual(cart["customer"], patient)
 		self.assertEqual(cart["items"][0]["item_code"], self.fx.drug)

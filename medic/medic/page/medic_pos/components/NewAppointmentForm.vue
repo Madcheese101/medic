@@ -194,21 +194,26 @@ import { APPOINTMENT_TYPES, AppointmentType, BLOOD_TYPES } from "../constants.js
 import DoctorDatePicker from "./DoctorDatePicker.vue";
 import { canDiscount, discountRule, maxDiscount } from "../discount.js";
 
-const props = defineProps({ initialNew: { type: Boolean, default: false } });
+const props = defineProps({
+	initialNew: { type: Boolean, default: false },
+	// { name, customer_name } of an existing patient to book for (from the patient file).
+	initialCustomer: { type: Object, default: null },
+});
 const emit = defineEmits(["created", "cancel"]);
 
 const { isRtl } = useRtl();
 const backIcon = computed(() => (isRtl.value ? "mdi-arrow-right" : "mdi-arrow-left"));
 
 const steps = [__("Patient"), __("Appointment")];
-const step = ref(1);
+// Booking for a known patient skips straight to the appointment details.
+const step = ref(props.initialCustomer ? 2 : 1);
 const step1Form = ref(null);
 const step2Form = ref(null);
 const saving = ref(false);
 
 // Step 1 state: either an existing customer, or a new patient to create.
-const isNew = ref(props.initialNew);
-const customer = ref(null);
+const isNew = ref(props.initialNew && !props.initialCustomer);
+const customer = ref(props.initialCustomer?.name || null);
 const patient = reactive({
 	customer_name: "",
 	date_of_birth: "",
@@ -232,7 +237,14 @@ const appt = reactive({
 // Consultations, reviews and follow-ups are never discounted.
 const showDiscount = computed(() => canDiscount() && appt.appointment_type === AppointmentType.TREATMENT);
 
-const options = reactive({ customer: [], employee: [], service_type: [], service: [] });
+const options = reactive({
+	customer: props.initialCustomer
+		? [{ title: props.initialCustomer.customer_name, value: props.initialCustomer.name }]
+		: [],
+	employee: [],
+	service_type: [],
+	service: [],
+});
 
 // Mirror patient_appointment.js: service types are groups under the clinic's parent service group.
 const serviceTypeFilters = computed(() => {
@@ -309,9 +321,9 @@ async function save() {
 	}
 }
 
-// Preload the link lists when the form opens.
+// Preload the link lists when the form opens; a preset patient keeps their own entry instead.
 onMounted(() => {
-	searchLink("customer", "Customer", "", {}, "customer_name");
+	if (!props.initialCustomer) searchLink("customer", "Customer", "", {}, "customer_name");
 	searchLink("employee", "Employee", "", doctorFilters, "employee_name");
 	searchLink("service_type", "Item Group", "", serviceTypeFilters.value, "name");
 	searchGenders("");

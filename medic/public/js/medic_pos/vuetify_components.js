@@ -41,7 +41,9 @@ export {
 	VSpacer,
 	VStepper,
 	VSwitch,
+	VTab,
 	VTable,
+	VTabs,
 	VTextarea,
 	VTextField,
 } from "vuetify/components";

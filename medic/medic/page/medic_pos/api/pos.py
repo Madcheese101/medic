@@ -244,6 +244,7 @@ def list_prescriptions(
 			"patient.customer_name as customer_name",
 			"patient.phone_number as mobile",
 			"posting_date",
+			"appointment",
 			"invoice_created",
 			"sales_invoice",
 		],

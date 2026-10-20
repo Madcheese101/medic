@@ -166,6 +166,20 @@ class TestLists(MedicTestCase):
 		)["rows"]
 		self.assertEqual([r["name"] for r in rows], [newer, older])
 
+	def test_outstanding_invoices_are_the_submitted_ones_still_owing(self):
+		patient = self.make_patient()
+		call("appointments.confirm_appointment_invoice", name=self.make_appointment(patient=patient))  # draft
+		paid = self.make_appointment(patient=patient)
+		call("appointments.confirm_appointment_invoice", name=paid)
+		call("appointments.pay_appointment", name=paid, payments=[self.cash(100)])
+		part = self.make_appointment(AppointmentType.REVIEW, patient=patient)
+		owing = call("appointments.confirm_appointment_invoice", name=part)["invoice"]
+		call("appointments.pay_appointment", name=part, payments=[self.cash(40)])
+
+		self.assertEqual(call("billing.get_sales_invoices", customer=patient)["total"], 3)
+		listed = call("billing.get_sales_invoices", customer=patient, outstanding_only=1)
+		self.assertEqual([(r["name"], r["outstanding_amount"]) for r in listed["rows"]], [(owing, 60)])
+
 
 def _payment_entry_for(invoice):
 	return frappe.db.get_value(

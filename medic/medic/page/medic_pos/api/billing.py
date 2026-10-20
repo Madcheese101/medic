@@ -80,12 +80,14 @@ def get_sales_invoices(
 	status=None,
 	from_date=None,
 	to_date=None,
+	outstanding_only=0,
 	start=0,
 	page_length=20,
 	sort_by=None,
 	sort_order=None,
 ):
-	"""One page of the company's Sales Invoices, filters applied on the DB."""
+	"""One page of the company's Sales Invoices, filters applied on the DB. `outstanding_only`
+	keeps the submitted invoices that still owe money, the ones behind the patient's balance."""
 	filters = {"company": company()}
 	if customer:
 		filters["customer"] = customer
@@ -93,6 +95,9 @@ def get_sales_invoices(
 		filters["status"] = status
 	if dates := date_range(from_date, to_date):
 		filters["posting_date"] = dates
+	if cint(outstanding_only):
+		filters["docstatus"] = 1
+		filters["outstanding_amount"] = [">", 0]
 
 	rows = frappe.qb.get_query(
 		"Sales Invoice",

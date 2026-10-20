@@ -1,16 +1,27 @@
 <template>
 	<v-card :loading="loading">
-		<v-card-title class="d-flex align-center">
+		<v-card-title class="d-flex align-center flex-wrap ga-2">
 			<v-btn
 				variant="text"
 				:icon="backIcon"
 				:title="__('Back')"
-				class="mr-2"
 				@click="emit('back')"
 			/>
 			<span class="text-truncate">{{ model.customer_name || __("Patient") }}</span>
 			<v-spacer />
-			<v-chip v-if="balance !== null" :color="balanceColor" variant="flat" size="large">
+			<v-btn color="primary" variant="tonal" prepend-icon="mdi-calendar-plus" @click="newAppointment">
+				{{ __("New Appointment") }}
+			</v-btn>
+			<!-- An amount owed opens the invoices behind it. -->
+			<v-chip
+				v-if="balance !== null"
+				:color="balanceColor"
+				variant="flat"
+				size="large"
+				:link="balance > 0"
+				:title="balance > 0 ? __('Show outstanding invoices') : undefined"
+				@click="balance > 0 && records.showOutstanding()"
+			>
 				<v-icon start icon="mdi-wallet-outline" />
 				{{ formatCurrency(balance, currency) }}
 			</v-chip>
@@ -35,6 +46,7 @@
 							type="date"
 							:label="__('Date of Birth')"
 							prepend-inner-icon="mdi-calendar"
+							:suffix="age"
 							:rules="[required]"
 						/>
 					</v-col>
@@ -111,7 +123,7 @@
 
 			<v-divider class="my-5" />
 
-			<PatientTreatments :customer="props.patient" />
+			<PatientRecords ref="records" :customer="props.patient" />
 		</v-card-text>
 	</v-card>
 </template>
@@ -121,15 +133,18 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useRtl } from "vuetify";
 import { call, customSearchLink, debounce, formatCurrency, notifySuccess } from "../client.js";
 import { BLOOD_TYPES, IllnessType } from "../constants.js";
+import { useUiStore } from "../stores/ui.js";
 import IllnessTable from "../components/IllnessTable.vue";
-import PatientTreatments from "../components/PatientTreatments.vue";
+import PatientRecords from "../components/PatientRecords.vue";
 
 
 const props = defineProps({ patient: { type: String, default: null } });
-const emit = defineEmits(["back"]);
+const emit = defineEmits(["back", "navigate"]);
 
+const uiStore = useUiStore();
 const { isRtl } = useRtl();
 const form = ref(null);
+const records = ref(null);
 const loading = ref(false);
 const savingPatient = ref(false);
 const savingHistory = ref(false);
@@ -152,6 +167,20 @@ const backIcon = computed(() => (isRtl.value ? "mdi-arrow-right" : "mdi-arrow-le
 const balanceColor = computed(() => {
 	if (!balance.value) return "surface-variant";
 	return balance.value > 0 ? "error" : "success";
+});
+
+// Whole years, or months for a baby under one.
+const age = computed(() => {
+	if (!model.date_of_birth) return "";
+	const born = frappe.datetime.str_to_obj(model.date_of_birth);
+	const now = new Date();
+	const months =
+		(now.getFullYear() - born.getFullYear()) * 12 +
+		now.getMonth() -
+		born.getMonth() -
+		(now.getDate() < born.getDate() ? 1 : 0);
+	if (months < 0) return "";
+	return months < 12 ? __("{0} months", [months]) : __("{0} years", [Math.floor(months / 12)]);
 });
 
 function required(value) {
@@ -208,6 +237,12 @@ async function saveHistory() {
 	} finally {
 		savingHistory.value = false;
 	}
+}
+
+// Book for this patient: the Appointments view opens its form with them already chosen.
+function newAppointment() {
+	uiStore.requestNewAppointment(false, { name: props.patient, customer_name: model.customer_name });
+	emit("navigate", "appointments");
 }
 
 onMounted(load);

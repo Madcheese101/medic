@@ -1,7 +1,6 @@
 <template>
 	<div>
 		<div class="d-flex align-center mb-2">
-			<div class="text-subtitle-2 text-medium-emphasis">{{ __("Treatments") }}</div>
 			<v-spacer />
 			<v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-plus" @click="newOpen = true">
 				{{ __("New Treatment") }}

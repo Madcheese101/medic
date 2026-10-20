@@ -123,7 +123,13 @@
 		</v-data-table-server>
 	</v-card>
 
-	<NewAppointmentForm v-else :initial-new="createNew" @created="onCreated" @cancel="creating = false" />
+	<NewAppointmentForm
+		v-else
+		:initial-new="createNew"
+		:initial-customer="createCustomer"
+		@created="onCreated"
+		@cancel="creating = false"
+	/>
 
 	<NewSessionDialog v-model="sessionOpen" @created="table.load" />
 
@@ -165,6 +171,7 @@ const cashierModes = frappe.boot.cashier_payment_modes?.length ? frappe.boot.cas
 const today = frappe.datetime.get_today();
 const creating = ref(false);
 const createNew = ref(false);
+const createCustomer = ref(null);
 const sessionOpen = ref(false);
 const checkingIn = ref(null);
 const confirming = ref(null);
@@ -273,18 +280,19 @@ async function confirmAndPay(item) {
 	}
 }
 
-function openCreate(newPatient) {
+function openCreate(newPatient, customer = null) {
 	createNew.value = !!newPatient;
+	createCustomer.value = customer;
 	creating.value = true;
 }
 
-// The app-bar "New" menu queues a request here; open the form and clear it.
+// The app-bar "New" menu and the patient file queue a request here; open the form and clear it.
 // immediate covers arriving from another view; the watch covers already being here.
 watch(
 	() => uiStore.pendingAppointment,
 	(req) => {
 		if (!req) return;
-		openCreate(req.newPatient);
+		openCreate(req.newPatient, req.customer);
 		uiStore.consumeNewAppointment();
 	},
 	{ immediate: true }
