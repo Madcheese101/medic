@@ -105,7 +105,7 @@ A **Single** doctype holding clinic-wide settings. Read on the backend via `frap
 
 | Doctype | Field | Type | Purpose |
 | --- | --- | --- | --- |
-| **Customer** | `custom_phone_number` | Phone | Patient mobile (filterable) |
+| **Customer** | `phone_number` | Phone | Patient mobile (filterable) |
 | | `date_of_birth` | Date | |
 | | `blood_type` | Select `A+…O-` | |
 | | `allow_credit` | Check | Waives the final-session payment gate on treatment plans |
