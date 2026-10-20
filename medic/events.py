@@ -1,5 +1,7 @@
 import frappe
 
+from medic.constants import AppointmentStatus
+
 
 def on_employee_create(doc, method=None):
 	doctor_default_designation = frappe.db.get_value("Clinic Setup", None, "doctors_default_designation")
@@ -51,9 +53,13 @@ def on_sales_invoice_cancel(doc, method=None):
 		return
 
 	# Check if the sales invoice is linked to a patient appointment
-	exists = frappe.db.exists("Patient Appointment", {"invoice": doc.name, "appointment_status": "مؤكد"})
+	exists = frappe.db.exists(
+		"Patient Appointment", {"invoice": doc.name, "appointment_status": AppointmentStatus.CONFIRMED}
+	)
 	if exists:
-		frappe.db.set_value("Patient Appointment", exists, "appointment_status", "غير مؤكد")
+		frappe.db.set_value(
+			"Patient Appointment", exists, "appointment_status", AppointmentStatus.UNCONFIRMED
+		)
 		return
 
 	# action_exists = frappe.db.exists("Appointment Actions", {"invoice": doc.name})

@@ -1,10 +1,15 @@
 import frappe
+
+from medic.billing import DISCOUNT_ROLES, mode_currency
+
+
 def extend_boot_info(bootinfo):
 	clinic_settings = frappe.get_single("Clinic Setup")
 	bootinfo["parent_service"] = clinic_settings.service_parent_item_group
 	bootinfo["default_doctor_designation"] = clinic_settings.doctors_default_designation
 	bootinfo["pharmacy_item_group"] = clinic_settings.pharmacy_item_group
 	bootinfo["max_discount_percentage"] = clinic_settings.doctor_max_discount_percentage
+	bootinfo["discount_roles"] = list(DISCOUNT_ROLES)
 
 	# Cashier POS Profile + its payment modes, so front-desk collections post under it.
 	profile_name = clinic_settings.cashier_pos_profile
@@ -25,8 +30,6 @@ def _pos_profile_modes(profile_name):
 	"""The profile's payment modes with their type, shaped like get_payment_modes for the dialogs."""
 	profile = frappe.get_cached_doc("POS Profile", profile_name)
 	modes = []
-	from medic.medic.page.medic_pos.api import mode_currency
-
 	for row in profile.payments:
 		modes.append(
 			{
