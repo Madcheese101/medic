@@ -6,6 +6,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 
+from medic.billing import company
+
 
 class TestRequest(Document):
 	def validate(self):
@@ -89,6 +91,10 @@ def make_sales_invoice(test_request, items=None):
 
 	si = frappe.new_doc("Sales Invoice")
 	si.customer = tr.patient
+	si.company = company()
+	# Separately-collected invoice: the cashier pays and submits it later; submitting seeds the
+	# result table (events.on_test_request_invoice_submit).
+	si.is_action_invoice = 1
 	for item_code in selected:
 		si.append("items", {"item_code": item_code, "qty": 1})
 	si.insert()
