@@ -20,13 +20,13 @@
    "fieldname": "illness_type",
    "fieldtype": "Select",
    "label": "Illness type",
-   "options": "\u0623\u062e\u0631\u0649\n\u062c\u0644\u062f\u064a"
+   "options": "Other\nSkin"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-30 14:36:13.227068",
+ "modified": "2026-10-20 08:00:00.000000",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Illness",

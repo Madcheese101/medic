@@ -32,7 +32,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Action Type",
-   "options": "\u0639\u0644\u0627\u062c\n\u062a\u062d\u0644\u064a\u0644\n\u0648\u0635\u0641\u0629 \u0637\u0628\u064a\u0629",
+   "options": "Treatment\nLab Test\nPrescription",
    "read_only": 1
   },
   {
@@ -48,7 +48,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-07-19 13:22:38.812915",
+ "modified": "2026-10-20 08:00:00.000000",
  "modified_by": "Administrator",
  "module": "Medic",
  "name": "Appointment Actions",

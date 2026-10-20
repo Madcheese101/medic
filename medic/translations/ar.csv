@@ -1,0 +1,14 @@
+Pending,انتظار,Patient Appointment
+Unconfirmed,غير مؤكد,Patient Appointment
+Confirmed,مؤكد,Patient Appointment
+Completed,مكتمل,Patient Appointment
+Cancelled,ملغي,Patient Appointment
+Consultation,كشف,Patient Appointment
+Treatment,علاج,Patient Appointment
+Review,مراجعة,Patient Appointment
+Follow-up,متابعة دورية,Patient Appointment
+Treatment,علاج,Appointment Actions
+Lab Test,تحليل,Appointment Actions
+Prescription,وصفة طبية,Appointment Actions
+Other,أخرى,Illness
+Skin,جلدي,Illness

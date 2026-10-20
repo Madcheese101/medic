@@ -1,12 +1,46 @@
 // Mirrors the Blood Type custom field options on Customer (medic/fixtures/custom_field.json).
 export const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
-// Mirrors the Patient Appointment doctype Select options.
-export const APPOINTMENT_TYPES = ["كشف", "علاج", "مراجعة", "متابعة دورية"];
+// Stored values of the Medic Select fields; mirrors medic/constants.py and the doctype JSON.
+export const AppointmentStatus = {
+	PENDING: "Pending",
+	UNCONFIRMED: "Unconfirmed",
+	CONFIRMED: "Confirmed",
+	COMPLETED: "Completed",
+	CANCELLED: "Cancelled",
+};
 
-// Mirrors the Appointment Actions action_type Select options.
-export const ACTION_TYPES = ["علاج", "تحليل", "وصفة طبية"];
-export const APPOINTMENT_STATUS = ["انتظار", "غير مؤكد", "مؤكد", "مكتمل", "ملغي"];
+export const AppointmentType = {
+	CONSULTATION: "Consultation",
+	TREATMENT: "Treatment",
+	REVIEW: "Review",
+	FOLLOW_UP: "Follow-up",
+};
+
+export const ActionType = {
+	TREATMENT: "Treatment",
+	LAB_TEST: "Lab Test",
+	PRESCRIPTION: "Prescription",
+};
+
+export const IllnessType = {
+	OTHER: "Other",
+	SKIN: "Skin",
+};
+
+// A stored Select value as the user reads it. Translations are keyed by the doctype
+// (medic/translations/ar.csv), the same context Frappe's own formatter uses.
+export function label(value, doctype) {
+	return value ? __(value, null, doctype) : "—";
+}
+
+const options = (values, doctype) =>
+	Object.values(values).map((value) => ({ title: label(value, doctype), value }));
+
+// Labelled options for selects and menus.
+export const APPOINTMENT_TYPES = options(AppointmentType, "Patient Appointment");
+export const APPOINTMENT_STATUS = options(AppointmentStatus, "Patient Appointment");
+export const ACTION_TYPES = options(ActionType, "Appointment Actions");
 
 // Mirrors the Prescription Items Select options (the blank first route option is dropped).
 export const PRESCRIPTION_ROUTES = [
@@ -35,9 +69,16 @@ export const PRESCRIPTION_ROUTES = [
 ];
 export const PRESCRIPTION_PER = ["Day", "Week"];
 
-// انتظار Pending, غير مؤكد Not Confirmed, مؤكد Confirmed, مكتمل Completed, ملغي Cancelled.
 export function appointmentStatusColor(status) {
-	return { انتظار: "warning", "غير مؤكد": "info", مؤكد: "success", مكتمل: "primary", ملغي: "error" }[status] || "surface-variant";
+	return (
+		{
+			[AppointmentStatus.PENDING]: "warning",
+			[AppointmentStatus.UNCONFIRMED]: "info",
+			[AppointmentStatus.CONFIRMED]: "success",
+			[AppointmentStatus.COMPLETED]: "primary",
+			[AppointmentStatus.CANCELLED]: "error",
+		}[status] || "surface-variant"
+	);
 }
 
 export function treatmentStatusColor(status) {
