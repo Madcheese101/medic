@@ -251,13 +251,26 @@ def create_session(treatment_plan, appointment_date=None):
 	plan = frappe.get_doc("Treatment Plan", treatment_plan)
 	if not plan.invoice:
 		frappe.throw(_("Create the plan invoice before adding sessions."))
+	# A refund closes the plan (Completed), so it takes no more sessions.
+	if plan.status != "Active":
+		frappe.throw(_("Sessions can only be added to an active plan."))
 
 	appointment_date = appointment_date or today()
 	validate_appointment_date(plan.employee, appointment_date)
 
-	session_no = frappe.db.count("Patient Appointment", {"treatment_plan": treatment_plan}) + 1
-	if session_no > cint(plan.total_sessions):
+	# Cancelled sessions don't count, so a cancelled session's number is given out again.
+	taken = frappe.get_all(
+		"Patient Appointment",
+		filters={
+			"treatment_plan": treatment_plan,
+			"docstatus": ["<", 2],
+			"appointment_status": ["!=", AppointmentStatus.CANCELLED],
+		},
+		pluck="session_no",
+	)
+	if len(taken) >= cint(plan.total_sessions):
 		frappe.throw(_("All sessions for this plan have already been created."))
+	session_no = next(n for n in range(1, len(taken) + 2) if n not in taken)
 
 	is_last = session_no == cint(plan.total_sessions)
 	gate_ok = plan.session_gate_ok(is_last)

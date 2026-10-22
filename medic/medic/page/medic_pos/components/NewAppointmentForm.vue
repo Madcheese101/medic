@@ -310,6 +310,11 @@ async function save() {
 		if (isNew.value) {
 			customerId = await call("patients.create_patient", { ...patient });
 			notifySuccess(__("Patient {0} created", [customerId]));
+			// Book for them as an existing patient from now on, so retrying after a failed
+			// booking (e.g. the doctor is fully booked) doesn't register them a second time.
+			options.customer = [{ title: patient.customer_name, value: customerId }];
+			customer.value = customerId;
+			isNew.value = false;
 		}
 		const name = await call("appointments.create_appointment", {
 			...appt,

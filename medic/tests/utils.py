@@ -138,24 +138,6 @@ def make_fixtures():
 		},
 	)
 
-	doctor = _insert(
-		"Employee",
-		first_name=f"{P} Doctor",
-		gender="Male",
-		date_of_birth="1980-01-01",
-		date_of_joining="2020-01-01",
-		company=co,
-		status="Active",
-		designation=designation,
-	).name
-	# on_employee_create made the schedule with every day off; open all days, no daily cap.
-	schedule = frappe.get_doc("Doctor Schedule", {"employee": doctor})
-	for row in schedule.schedule:
-		row.update(
-			{"is_active": 1, "from_time": "08:00:00", "to_time": "20:00:00", "maximum_appointments": 0}
-		)
-	schedule.save()
-
 	return frappe._dict(
 		company=co,
 		currency=currency,
@@ -174,8 +156,36 @@ def make_fixtures():
 			_item(f"{P} Glucose", lab_group, 20, price_list),
 		],
 		drug=_item(f"{P} Paracetamol", pharmacy_group, 5, price_list, stock=True),
-		doctor=doctor,
+		doctor=make_doctor(),
 	)
+
+
+def make_doctor(maximum_appointments=0):
+	"""A doctor open every day, taking up to `maximum_appointments` a day (0 = no cap)."""
+	doctor = _insert(
+		"Employee",
+		# Doctor Schedule is named after the doctor, so each one needs a name of its own.
+		first_name=f"{P} Doctor {frappe.generate_hash(length=6)}",
+		gender="Male",
+		date_of_birth="1980-01-01",
+		date_of_joining="2020-01-01",
+		company=company(),
+		status="Active",
+		designation=frappe.db.get_single_value("Clinic Setup", "doctors_default_designation"),
+	).name
+	# on_employee_create made the schedule with every day off.
+	schedule = frappe.get_doc("Doctor Schedule", {"employee": doctor})
+	for row in schedule.schedule:
+		row.update(
+			{
+				"is_active": 1,
+				"from_time": "08:00:00",
+				"to_time": "20:00:00",
+				"maximum_appointments": maximum_appointments,
+			}
+		)
+	schedule.save()
+	return doctor
 
 
 def _insert(doctype, **fields):

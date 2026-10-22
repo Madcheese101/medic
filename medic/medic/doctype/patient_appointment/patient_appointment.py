@@ -78,6 +78,9 @@ class PatientAppointment(Document):
 		self.db_set("appointment_status", AppointmentStatus.COMPLETED, notify=True)
 
 	def _next_queue(self):
+		# Check-ins for one doctor take turns on the doctor's Employee row until they commit, so
+		# two at the same moment can't both read the same highest number.
+		frappe.db.get_value("Employee", self.employee, "name", for_update=True)
 		taken = frappe.get_all(
 			"Patient Appointment",
 			filters={"employee": self.employee, "appointment_date": self.appointment_date, "queue": [">", 0]},

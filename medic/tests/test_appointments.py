@@ -2,7 +2,7 @@ import frappe
 from frappe.utils import add_days, flt, today
 
 from medic.constants import ActionType, AppointmentStatus, AppointmentType
-from medic.tests.utils import MedicTestCase, appointment_status, call
+from medic.tests.utils import MedicTestCase, appointment_status, call, make_doctor
 
 
 class TestAppointmentLifecycle(MedicTestCase):
@@ -50,6 +50,28 @@ class TestAppointmentLifecycle(MedicTestCase):
 	def test_appointment_must_be_checked_in_before_completing(self):
 		name, _ = self.make_paid_appointment()
 		self.assertRaises(frappe.ValidationError, call, "appointments.complete_appointment", name=name)
+
+	def test_cancelled_appointment_frees_its_slot(self):
+		doctor = make_doctor(maximum_appointments=1)
+		first = self._book(doctor)
+		self.assertRaises(frappe.ValidationError, self._book, doctor)
+
+		# A refund cancels the appointment this way, leaving it submitted.
+		frappe.db.set_value("Patient Appointment", first, "appointment_status", AppointmentStatus.CANCELLED)
+		self._book(doctor)
+		booked = call("appointments.get_doctor_availability", employee=doctor)["booked"]
+		self.assertEqual(booked[today()], 1)
+
+	def _book(self, doctor):
+		return call(
+			"appointments.create_appointment",
+			appointment_type=AppointmentType.CONSULTATION,
+			customer=self.make_patient(),
+			employee=doctor,
+			appointment_date=today(),
+			service_type=self.fx.consult_group,
+			service=self.fx.consult_item,
+		)
 
 
 class TestAppointmentPayments(MedicTestCase):

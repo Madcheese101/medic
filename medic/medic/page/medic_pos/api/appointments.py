@@ -53,6 +53,8 @@ def get_doctor_availability(employee):
 			"employee": employee,
 			"appointment_date": [">=", today()],
 			"docstatus": ["<", 2],
+			# A refund cancels an appointment but leaves it submitted; it no longer takes a slot.
+			"appointment_status": ["!=", AppointmentStatus.CANCELLED],
 		},
 		fields=["appointment_date", "count(name) as n"],
 		group_by="appointment_date",
@@ -82,6 +84,7 @@ def validate_appointment_date(employee, appointment_date, ignore=None):
 		"employee": employee,
 		"appointment_date": appointment_date,
 		"docstatus": ["<", 2],
+		"appointment_status": ["!=", AppointmentStatus.CANCELLED],
 	}
 	if ignore:
 		filters["name"] = ["!=", ignore]

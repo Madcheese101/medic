@@ -74,6 +74,29 @@ class TestTreatmentPlans(MedicTestCase):
 		call("treatments.create_session", treatment_plan=plan)
 		self.assertRaises(frappe.ValidationError, call, "treatments.create_session", treatment_plan=plan)
 
+	def test_closed_plan_takes_no_sessions(self):
+		plan = self.make_plan(3)
+		call("treatments.create_treatment_plan_invoice", name=plan, payments=[self.cash(300)])
+		# A refund closes the plan this way.
+		frappe.db.set_value("Treatment Plan", plan, "status", "Completed")
+		self.assertRaises(frappe.ValidationError, call, "treatments.create_session", treatment_plan=plan)
+
+	def test_cancelled_session_is_booked_again_under_its_number(self):
+		plan = self.make_plan(3)
+		call("treatments.create_treatment_plan_invoice", name=plan, payments=[self.cash(300)])
+		first = call("treatments.create_session", treatment_plan=plan)
+		call("treatments.create_session", treatment_plan=plan)
+		frappe.db.set_value("Patient Appointment", first, "appointment_status", AppointmentStatus.CANCELLED)
+
+		numbers = [
+			frappe.db.get_value(
+				"Patient Appointment", call("treatments.create_session", treatment_plan=plan), "session_no"
+			)
+			for _ in range(2)
+		]
+		self.assertEqual(numbers, [1, 3])
+		self.assertRaises(frappe.ValidationError, call, "treatments.create_session", treatment_plan=plan)
+
 	def test_added_sessions_are_free(self):
 		plan = self.make_plan(2)
 		invoice = call("treatments.create_treatment_plan_invoice", name=plan)
